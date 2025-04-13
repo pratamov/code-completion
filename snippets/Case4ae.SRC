@@ -1,0 +1,10 @@
+{=========================== _ModVarParm\Case4Mod ============================}
+{=============================================================================}
+[
+  Constant Variable1(72) = "Mary had a little wooly one";
+]
+
+Main [
+]
+
+{ End of _ModVarParm\Case4Mod }

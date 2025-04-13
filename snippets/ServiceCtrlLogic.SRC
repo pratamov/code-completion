@@ -1,0 +1,181 @@
+{============================ ServiceCtrlLogic ===============================}
+{ Simplistic service control logic for test purposes.                         }
+{=============================================================================}
+(
+  ServiceCtrlObj                { The service control code instance using me  };
+)
+[
+  {***** Public interface required by service control logic *****}
+  InitialiseState Module        { Builds server states from persisted data    };
+   { These two subroutines are called during GetServerCHanges, in a CriticalSection.
+     They allow the plug-in to augment the synchronisation package for this service. }
+  StartGetServerChanges Module  { Called at start of GetServerChanges         };
+  EndGetServerChanges Module    { Called during GetServerChanges, after the
+                                  generic service has built its package into
+                                  the supplied stream, but before SetSyncComplete
+                                  is added to the stream. The parent service calls
+                                  SetDivert after this returns.               };
+  
+  {***** Private variables *****}
+  Retained CurrentServer = "POMSNB" { Who is the server                       };
+  EvaluateServer Module         { Works out who is server                     };
+   { RPC methods called during synchronisation }
+  SetCurrentServerRPC Module    { Called before parent's methods              };
+  DummyEndRPC   Module          { Called after parent's methods               };
+  Servers;
+]
+
+Main [
+  If Watch(0, CurrentServer);
+  [
+    \RPCManager\Send(\ServiceName { service }, \LocalGUID { GUID },
+                     \RPC_ACCEPT_ALL { mode cut-off }, 1 { server }, Invalid { machine },
+                     1 { clients }, 0 { locally }, 1 { recursive }, "SetCurrentServerRPC" { module },
+                     Concat(\RPCScopeName, "\LogicObj") { scope  }, Invalid { queue data },
+                     Invalid { InputSessionID },
+                     { Parameters: } CurrentServer);
+    EvaluateServer();
+  ]
+  Servers = \RPCManager\GetInSyncServers(\ServiceName);
+]
+
+<
+{============================== InitialiseState ==============================}
+{ Called when my owning ServiceCtrl instance is becoming server.              }
+{=============================================================================}
+InitialiseState
+
+InitialiseState [
+  If 1;
+  [
+    EvaluateServer();
+    Return(Invalid);
+  ]
+]
+
+{ End of ServiceCtrlLogic\InitialiseState }
+>
+
+<
+{============================== EvaluateServer ===============================}
+{ Called by InitialiseState and by the Main state.  Sets the state of each    }
+{ service in my owning ServiceCtrl instance data structure (ServerStates).    }
+{=============================================================================}
+EvaluateServer
+[
+  I                             { Loop control variable                       };
+  J                             { Loop control variable                       };
+  pServiceEntry                 { Current service entry being processed       };
+]
+
+EvaluateServer [
+  If 1;
+  [
+    {***** Needs a CriticalSection to avoid race conditions *****}
+    CriticalSection(
+      {***** For each service in ServerStates, simply set the server states
+             according to the last known server. *****}
+      I = ArraySize(\ServerStates, 1);
+      WhileLoop(--I >= 0,
+        pServiceEntry = &(\ServerStates[\#SST_STATES][I]);
+        J = ArraySize(*pServiceEntry, 1);
+        WhileLoop(--J >= 0,
+          IfElse(PickValid(!StrICmp(CurrentServer, (*pServiceEntry)[\#SST_SS_SERVER][J]), 0),
+            (*pServiceEntry)[\#SST_SS_STATE][J] = \#RPCServer;
+          { else }
+            (*pServiceEntry)[\#SST_SS_STATE][J] = \#RPCClient;
+          );
+        );
+      );
+      \Trigger = 1;
+    );
+    Return(Invalid);
+  ]
+]
+
+{ End of ServiceCtrlLogic\EvaluateServer }
+>
+
+<
+{=========================== StartGetServerChanges ===========================}
+{ Called at the start of GetServerChanges from the parent service.            }
+{ Expected to pack any RPC calls needed into a new stream and return that     }
+{ stream to the parent, for subsequent RPCs to be packed in.                  }
+{=============================================================================}
+StartGetServerChanges
+
+StartGetServerChanges [
+  If 1;
+  [
+    Return(\RPCManager\PackRPC(Invalid, "SetCurrentServerRPC" { module },
+                               Concat(\RPCScopeName, "\LogicObj") { scope },
+                               { Parameters: } CurrentServer));
+  ]
+]
+
+{ End of ServiceCtrlLogic\StartGetServerChanges }
+>
+
+<
+{============================ EndGetServerChanges ============================}
+{ Called after GetServerChanges in the parent service has added its packed    }
+{ RPCs to the sync package, but before the parent adds SetSyncComplete and    }
+{ calls SetDivert.                                                            }
+{ Expected to pack any RPC calls needed into the supplied stream and return   }
+{ that stream to the parent, for the SetSyncComplete to be added.             }
+{=============================================================================}
+EndGetServerChanges
+(
+  Stream                            { Stream of packed RPC calls from parent  };
+)
+
+EndGetServerChanges [
+  If 1;
+  [
+    Return(\RPCManager\PackRPC(Stream, "DummyEndRPC" { module },
+                               Concat(\RPCScopeName, "\LogicObj") { scope },
+                               { Parameters: } CurrentServer));
+  ]
+]
+
+{ End of ServiceCtrlLogic\EndGetServerChanges }
+>
+
+<
+{============================ SetCurrentServerRPC ============================}
+{ Dummy start RPC, just to test out the mechanism.                            }
+{=============================================================================}
+SetCurrentServerRPC
+(
+  ServerName                      { Name of the server to use                 };
+)
+
+SetCurrentServerRPC [
+  If 1;
+  [
+    CurrentServer = ServerName;
+    Return(Invalid);
+  ]
+]
+
+{ End of ServiceCtrlLogic\SetCurrentServerRPC }
+>
+
+<
+{================================ DummyEndRPC ================================}
+{ Dummy end RPC, just to test out the mechanism.                              }
+{=============================================================================}
+DummyEndRPC
+
+DummyEndRPC [
+  If 1;
+  [
+    Return(Invalid);
+  ]
+]
+
+{ End of ServiceCtrlLogic\DummyEndRPC }
+>
+
+{ End of ServiceCtrlLogic }
+

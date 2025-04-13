@@ -1,0 +1,17 @@
+{=========================== _ModVarParm\Case5Mod ============================}
+{=============================================================================}
+(
+  Param1;
+  Param2 <:TestMetaData(1, "Hi", 3.14159):> Object<AnalogStatus, DigitalStatus, Modem> { This is a comment };
+  Param3;
+)
+[
+  X;
+]
+
+Main [
+  X = Param1;
+  Return(Self());
+]
+
+{ End of _ModVarParm\Case5Mod }

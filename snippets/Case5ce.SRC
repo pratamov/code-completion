@@ -1,0 +1,19 @@
+{=========================== _ModVarParm\Case5Mod ============================}
+{=============================================================================}
+(
+  Param1 <:TestMetaData(1, "Hi", 3.14159):> Object<AnalogStatus, DigitalStatus, Modem> { This is a comment };
+  Param2 <:"Meta String":> Double { This is a comment };
+  Param3;
+)
+[
+  X;
+  Constant Variable1(72) = "Mary had a little wooly one";
+  Constant Variable2(69) = "Mary had a very ""wooly"" one";
+]
+
+Main [
+  X = Param1;
+  Return(Self());
+]
+
+{ End of _ModVarParm\Case5Mod }

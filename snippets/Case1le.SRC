@@ -1,0 +1,17 @@
+{=========================== _ModVarParm\Case1Mod ============================}
+{=============================================================================}
+(
+)
+[
+  Variable1(0);
+  Shared Variable2(0);
+  Variable3(42);
+  Constant Variable4(69) = "Mary had a little wooly one";
+  Variable5(65532) Double = 42.69;
+  Variable6(655) Object<AnalogStatus, DigitalStatus, Modem> = 42.69;
+  Variable7(CVCLASS) { This is another comment };
+  Variable8(15) <:TestMetaData(1, "Hi", 3.14159):> Object = 1234;
+  Variable9(150) <:TestMetaData(1, "Hi", 3.14159):> Object<AnalogStatus, DigitalStatus, Modem> = 42.69 { This is a comment };
+  TempToRealVar(0);
+]
+{ End of _ModVarParm\Case1Mod }

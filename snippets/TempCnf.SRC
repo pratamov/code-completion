@@ -1,0 +1,165 @@
+{=============================== ConfigFolder ==============================}
+{ This is a sample module and is not complete - it does not handle all of   }
+{ the parameters for this point.                                            }
+{ This module draws the contents of the tabbed dialog box for editing the   }
+{ parameters of the point.  Changes to these parameters will be written to  }
+{ the ODBC database.  This module gets passed two parameters which give a   }
+{ list of the current parameter values and the tab number to display.  The  }
+{ properties module (declared within this file) and the navigator calls     }
+{ define the number and labels for the tabs.  This module must be manually  }
+{ coded to correspond to the coding for those modules.  It is up to you to  }
+{ determine the split of parameters across the tabs.  A given parmeter may  }
+{ appear on multiple tabs if it makes sense.  The first tab is, by          }
+{ convention, the "ID" tab.  This tab handles the Name, Area, and           }
+{ Description parameters.                                                   }
+{ This module uses the "P" modules defined in \DialogLibrary.  These        }
+{ modules are also used in the Panel code.  There is no restriction         }
+{ to defining the user interface code although the use of the "P" modules   }
+{ simplifies many common requirements.                                      }
+{===========================================================================}
+(
+  Parms                       { Pointer to array of parameters              };
+  Current                     { Currently selected tab (starts at 0)        };
+  PtrWaitClose                { Pointer to FLAG - True when wait to close   };
+  OKPressed                   { TRUE when user presses OK on the dialog     };
+)
+
+[
+  Constant WIDTH = 550        { Width of our dialog box                     };
+
+  Trigger                     { Edit field trigger                          };
+  Temp                        { Starting value of droplist for data type    };
+
+  { The following variables defined as class 1 variables are a list of the
+    tab name variables found in the Settings.Dynamic file.  The order of the
+    variables will be the order of the tabs displayed.  These variable name
+    are not actually displayed on the tabs.  These variable names are the names
+    of the variables in the Settings.Dynamic file which have the real tab
+    names.  This allows translation into other languages without changing
+    the code.  If these variables have a default value and there is no
+    corresponding value set in the Settings.Dynamic file, the default value is
+    used for the tab label.                                                 }
+  [(1)
+    IDTabLabel      = "ID";
+    IOTabLabel      = "I/O";
+    EventsTabLabel  = "Events";
+  ]
+]
+
+InitConfigFolder [
+  If 1 Switch;
+  [
+    *PtrWaitClose = 0;
+     { Set up default values for parameters which are undefined currently
+       so that the dialog box controls can deal with valid values.          }
+    Parms[\#AlarmInhibit] = PickValid(Parms[\#AlarmInhibit], 0);
+    Parms[\#ScanInterval] = PickValid(Parms[\#ScanInterval], 0);
+    Parms[\#Priority    ] = PickValid(Parms[\#Priority],     0);
+    Parms[\#LogRate     ] = PickValid(Parms[\#LogRate],      0);
+  ]
+]
+
+Switch [
+  If Current == 0 ID;
+  If Current == 1 IO;
+  If Current == 2 Events;
+]
+
+ID [
+  If Current != 0 && !*PtrWaitClose Switch;
+
+  {***** Let the caller know when its ok to close *****}
+  *PtrWaitClose = PickValid(Trigger, 1) == 0;
+
+  {***** Name of the point (parameter 0) *****}
+  GUITransform(30, 95, WIDTH - 30, 50   { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditName(Trigger { trigger }));
+
+  {***** Group (area) that the point belongs to (parameter 1) *****}
+  GUITransform(30, 150, WIDTH - 30, 105 { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PAreaSelect(1 { can edit }, 2 { ID }, Parms[1] { Init },
+                                          1 { Bevel }, 0 { VertAlign },
+                                          1 { AlignTitle }, 1 { ParmNum },
+                                          Trigger { Trigger }, OKPressed));
+
+  {***** Description of the point (parameter 2) *****}
+  GUITransform(30, 205, WIDTH - 30, 160 { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(2, \GetPhrase("DescriptionLabel"), 4 { text }, 3 { ID }, Trigger { trigger }));
+
+  {***** Container object - the "Template" string specifies the name
+         of the point type that we are contributing to (another point of
+         our own type in this example).                             *****}
+  GUITransform(30, 260, WIDTH - 30, 215 { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PSelectObject(\#Container, "Template", \GetPhrase("ContainerLabel")));
+]
+
+IO [
+  If Current != 1 && !*PtrWaitClose Switch;
+
+  {***** Let the caller know when its ok to close *****}
+  *PtrWaitClose = PickValid(Trigger, 1) == 0;
+
+  {***** Questionable data flag *****}
+  GUITransform(140, 90, WIDTH - 270, 60 { Boundaries of xform            },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PCheckBox(\#Questionable, \GetPhrase("QuestionableLabel"), 1, 2));
+
+  {***** Address within the IODevice *****}
+  GUITransform(140, 145, WIDTH - 140, 100 { Boundaries of transform      },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(\#Address, \GetPhrase("ReadAddressLabel"), 4 { text }, 2 { ID }, Trigger { trigger }));
+
+  {***** Scan ScanInterval (interval in seconds) *****}
+  GUITransform(140, 200, WIDTH - 140, 155 { Boundaries of transform  },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(\#ScanInterval, \GetPhrase("ScanRateLabel"), 3 { float }, 3 { ID }, Trigger { trigger }));
+]
+
+Events [
+  If Current != 2 && !*PtrWaitClose Switch;
+
+  {***** Let the caller know when its ok to close *****}
+  *PtrWaitClose = PickValid(Trigger, 1) == 0;
+
+   {***** Log Rate *****}
+  GUITransform(110, 95, WIDTH - 110, 50 { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(\#LogRate, \GetPhrase("DataLogRateLabel"), 3 { float }, 1 { ID }, Trigger { trigger }));
+
+   {***** Alarm inhibited flag *****}
+  GUITransform(30, 155, WIDTH/2 - 130, 110 { Boundaries of xform         },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PCheckBox(\#AlarmInhibit, \GetPhrase("InhibitAlarmLabel"), 1, 2));
+
+   {***** Alarm priority *****}
+  GUITransform(WIDTH/2, 155, WIDTH - 110, 110 { Boundaries of transform  },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PSpinBox(\#Priority, \GetPhrase("AlarmPriorityLabel"), 1, 0, 100, 2,Invalid,0 { no edit },
+                                       2 { ID }, Invalid, Invalid, Trigger { trigger }));
+]
+
+{ End of ConfigFolder }

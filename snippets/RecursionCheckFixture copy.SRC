@@ -1,0 +1,135 @@
+{=============================== TestFixture =================================}
+{ This source file is included in the TestSourceFiles subdirectory because    }
+{ its presence is required to run the RecursionCheck unit tests.              }
+{=============================================================================}
+[
+  FixtureReady = FALSE            { TRUE when fixture ready                   };
+  Library Module                  { Fake library holding drawing methods      };
+  Library1 Module                 { Fake library holding drawing methods      };
+]
+
+Init [
+  If 1 Wait;
+  [
+    FixtureReady = TRUE;
+  ]
+]
+
+Wait [
+]
+
+<
+{=========================== TestFixture\Library =============================}
+{=============================================================================}
+Library
+[
+  TargetMod Module                { The target of the recursion tests         };
+  PlainRect Module                { Fake drawing methods - innocuous one      };
+  CallsTargetMod Module           { Fake drawing method. Calls TargetMod      };
+  PCallTargetMod Module           { Fake drawing method. Calls TargetMod via param };
+]
+
+<
+{====================== TestFixture\Library\PlainRect ========================}
+{=============================================================================}
+TargetMod
+
+Main [
+   GUITransform(50, 150, 150, 50,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                Variable("Library")\PlainRect());
+]
+{ End of TestFixture\Library\TargetMod }
+>
+
+<
+{====================== TestFixture\Library\PlainRect ========================}
+{=============================================================================}
+PlainRect
+
+Main [
+  GUIRectangle(50, 100, 100, 50,
+               1, 1, 1, 1, 1 { Scaling              },
+               0, 0          { Movement             },
+               1, 0          { Visibility, reserved },
+               0, 0, 0       { Selectability        },
+               Brush(186, 0, 1), Pen(15, 0, 2));
+]
+{ End of TestFixture\Library\PlainRect }
+>
+
+<
+{=================== TestFixture\Library\CallsTargetMod ======================}
+{=============================================================================}
+CallsTargetMod
+
+Main [
+   GUITransform(50, 150, 150, 50,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                Variable("Library")\TargetMod());
+]
+
+{ End of TestFixture\Library\CallsTargetMod }
+>
+
+<
+{=================== TestFixture\Library\PCallTargetMod ======================}
+{=============================================================================}
+PCallTargetMod
+(
+  P1 Object<Library>;
+)
+
+Main [
+   GUITransform(50, 150, 150, 50,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                P1\TargetMod());
+]
+
+{ End of TestFixture\Library\PCallTargetMod }
+>
+
+{ End of TestFixture\Library }
+>
+
+<
+{=========================== TestFixture\Library1 =============================}
+{=============================================================================}
+Library1
+[
+  PCallTargetMod Module           { Fake drawing method. Calls TargetMod via param };
+]
+
+<
+{=================== TestFixture\Library\PCallTargetMod ======================}
+{=============================================================================}
+PCallTargetMod
+(
+  P1 Object<Library>;
+)
+
+Main [
+   GUITransform(50, 150, 150, 50,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                P1\CallsTargetMod());
+]
+
+{ End of TestFixture\Library1\PCallTargetMod }
+>
+
+{ End of TestFixture\Library1 }
+>
+
+{ End of TestFixture }

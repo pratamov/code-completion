@@ -1,0 +1,24 @@
+{==================== CreateVariables\TestFixture ============================}
+{=============================================================================}
+(
+  Framework;
+)
+[
+  FixtureReady = 0                { TRUE when fixture ready                   };
+  System;
+  CONSTANT CVCLASS = 99           { Class value constant                      };
+  CONSTANT LIBRARIES = 0xFF01;
+]
+
+Init [
+  If 1 Wait;
+  [
+    System = SystemSelf(FrameWork);
+    FixtureReady = 1;
+  ]
+]
+
+Wait [
+]
+
+{ End of CreateVariables\TestFixture }

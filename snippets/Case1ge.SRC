@@ -1,0 +1,14 @@
+{=========================== _ModVarParm\Case1Mod ============================}
+{=============================================================================}
+(
+)
+[
+  Variable1(0);
+  Shared Variable2(0);
+  Variable3(42);
+  Constant Variable4(69) = "Mary had a little wooly one";
+  Variable5(65532) Double = 42.69;
+  Variable6(655) Object<AnalogStatus, DigitalStatus, Modem> = 42.69;
+  Variable7(5) <:"Meta String":> Object<AnalogStatus, DigitalStatus, Modem> = 42.69;
+]
+{ End of _ModVarParm\Case1Mod }

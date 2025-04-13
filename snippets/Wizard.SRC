@@ -1,0 +1,385 @@
+{============================== Wizard =======================================}
+{ This template demonstrates the basic layout of a Wizard module.             }
+{ This template is suitable either for direct launching, or for use as a      }
+{ DisplayManager page.                                                        }
+{=============================================================================}
+{ Receive any required parameters from the calling environment ...            }
+(
+  Param1;
+  Param2;  { etc, etc ... }
+)
+[
+{=============================================================================}
+{ If this Wizard is to be a DisplayManager page, then the following variables
+  control how DisplayManager shows this Wizard.                               }
+  Title = "Wizard Template"   { Change this as required                       };
+  Constant PageWidth  = 520   { You can change this if you want               };
+  Constant PageHeight = 360   { You can change this if you want               };
+  Constant WinFlag    = 1;
+  Constant PageStyle  = 0;
+  Constant PageWinOpt = 0b1010010100000111;
+  Constant NoStretch  = 1;
+  Constant Bitmap;
+  Constant Color = -17     { Background color for page - #SYSCOLOR_BUTTONFACE };
+
+  SecBit                   { Set page security as required                    };
+
+  WindowCloseFlag = 1      { Flag tells DispMgr not to close our window       };
+{=============================================================================}
+  Wizard       Module       { Wizard serialisation engine                     };
+
+  Constant Forward  =  1;
+  Constant Backward = -1;
+  Constant SPACE = 8;
+
+  Move                      { State change trigger                            };
+  NextState                 { Next step in the wizard serialisation           };
+  WTitle                    { Text for header bar                             };
+  Cancel = 0                { Cancel flag - set when engine wishes to cancel  };
+  Constant CRLF = Concat(MakeBuff(1, 13), MakeBuff(1, 10));
+
+{=============================================================================}
+  Constant  LHS = 8         { LHS of the message panel                        };
+  Constant  TOP = 60        { Top of the message panel                        };
+  Protected BOT             { Y coord of horiz line above buttons             };
+  Protected RHS             { RHS of the drawing panel                        };
+  Protected MID             { Centre of drawing panel                         };
+  Protected Split           { Horizontal division of drawing panel            };
+  Root                      { Object value of Wizard - useful for tag config  };
+
+  Retained xPos = 50        { Our initial screen X pos (not DispMgr page)     };
+  Retained yPos = 50        { Our initial screen Y pos (not DispMgr page)     };
+
+{=============================================================================}
+{ In general, if the Wizard is being used to perform Tag configuration then   }
+{ the simplest way to to this is to start the Wizard with a Parms array       }
+{ parameter of the correct size for the Tag type and to fill in the Parms     }
+{ array as you proceed.  It is usually possible to call a Tag's ConfigFolder  }
+{ since with Root pointing to Self and the Parms array, the calling envir-    }
+{ onment is correct.  If it is required to configure multiple Tags, then      }
+{ create multiple parameter arrays and swap them in/out of "Parms" as needed. }
+{=============================================================================}
+  { Parameter indicies - these are standard, add others as required }
+  Constant #Name             =  0;
+  Constant #Area             =  1;
+  Constant #Description      =  2;
+
+  #IODevice;
+  Protected TmpCfg;
+  Parms;
+{=============================================================================}
+]
+
+WizardInit [
+  If 1 WizardMain;
+  [
+    { Setup instance }
+    SetInstanceName(Self, \SecurityManager\GetAccountID());
+
+    { Setup some basic metrics }
+    RHS = PageWidth - 8;
+    BOT = PageHeight - 40;
+    MID = Int(PageWidth / 2);
+    Split = MID + 40;
+
+
+{ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv }
+{ If you are going to be configuring Tags, then you will likely need a parms
+  array and various offsets into that array.  You can establish these
+  dynamically as follows ... }
+    { Get a module/object handle to the required tag type }
+    TmpCfg    = Scope(\Code, "SampleTag");
+    { Get its parameter indicies }
+    #IODevice = GetDefaultValue(FindVariable("#IODevice", TmpCfg, 0, 0));
+    Parms     = New(FormalParms(TmpCFG));
+{ ... or, alternatively ... }
+    #IODevice = GetDefaultValue(FindVariable("#IODevice", Variable("SampleTag"), 0, 0));
+    Parms     = New(FormalParms(Variable("SampleTag")));
+{ However, for this example, we will just do ... }
+    Parms     = New(3);
+{ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ }
+
+    IfThen(Caller(Self)\IsDisplayManagerPage,
+      { Running as a DisplayManager page - launch a Wizard }
+      Wizard(Parms);
+      ForceState("WizardDMmain");
+    );
+  ]
+]
+
+
+WizardDMmain [
+  { Running as a DisplayManager page }
+  If Cancel;
+  [
+    \DisplayManager\StopPage(Self);
+  ]
+]
+
+
+WizardMain [
+  { Not started by DisplayManager - create a Window for the Wizard }
+  Window( Xpos, Ypos,
+          PageWidth, PageHeight,
+          PageWidth, PageHeight,
+          Wizard(Parms),
+          PageWinOpt,
+          Title,
+          Color,
+          1);
+
+  If Change(VStatus(Root, 15), 0) || Change(VStatus(Root, 16), 0);
+  [
+    { Save changes to onscreen location unless minimized }
+    IfThen(!VStatus(Root, 28),
+      xPos  = VStatus(Root, 15);
+      yPos  = VStatus(Root, 16);
+    );
+  ]
+
+  If Cancel Done;
+  [
+    Slay(Self, 0);
+  ]
+]
+
+Done [
+]
+
+
+<
+{================================ Wizard =====================================}
+{ This is the Wizard serialisation module.                                    }
+{                                                                             }
+{ Methods supported by the Wizard Engine:                                     }
+{                                                                             }
+{   Error         - Error dialog                                              }
+{   FinalCheckBox - Checkbox option on final pane                             }
+{   ForceMove     - State change by computed trigger                          }
+{   InitCheckBox  - Checkbox option on initial pane                           }
+{   NextIs        - Specify next state in flow (default is next in source)    }
+{   NoNext        - Grey the Next button according to conditional             }
+{   SkipIf        - Skip this state according to conditional                  }
+{   Switch        - Multiple branching tied into iconified radio buttons      }
+{   Trim          - Remove leading & trailing whitespace from string          }
+{   EndControl    - Controls processing options at end of Wizard flow         }
+{                                                                             }
+{ Remember, only use the Wizard Engine methods - do NOT add your own state    }
+{ transition logic for the states controlled by the Wizard Engine.            }
+{=============================================================================}
+Wizard
+(
+  Parms;
+)
+[
+  Protected Engine          { Instance of the WizardEngine                    };
+  Protected Trig            { Trigger for input field completion              };
+  Protected Msg             { Current message to display                      };
+
+{ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv }
+  { The following variables are used by the sample code snippets ...          }
+  Protected NewTagName      { Entered new tagname value                       };
+  Protected I               { Ubiquitous loop counter                         };
+  Protected Private = 0     { Sample state control                            };
+  Protected Emsg            { Temporary error message variable                };
+  Protected StartDate;
+  Protected ShowCalendar = 0;
+{ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ }
+]
+
+Init [
+  If !Valid(Engine);
+  [
+    Root = Self();
+    Engine = Launch(Scope(\Code, "WizardEngine"), Self, Self,
+                GetDefaultValue(FindVariable("Title", Self, 0, 1))      { Wizard Title   },
+                MakeBitmap(\LibX\FindFile("Resources\WizVTS.jpg", TRUE)) { 80*160 graphic },
+                &nextState           { control directive set by Wizard Engine },
+                &Move                { control trigger set by Wizard Engine   },
+                &Cancel              { set when Wizard cancels                },
+                &WTitle              { title for individual panes             });
+  ]
+
+  WTitle = ConCat("This wizard is a template for a new Wizard.",
+                  CRLF, CRLF, CRLF, CRLF,
+                 "Press NEXT to continue");
+
+{ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv }
+{ Sample use of InitCheckBox                                                  }
+  Private = Engine\InitCheckBox(Private, "Don't ask for my details", 1);
+  Engine\NextIs(Private ? "PickDate" : "AskDetails");
+{ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ }
+
+  If Move;
+  [
+    Move = 0;
+    ForceState(NextState);
+  ]
+]
+
+
+{ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv }
+{ The following states are samples which demonstrate some of the Wizard
+  functionality.  Replace with your own requirements.                         }
+AskDetails [
+  WTitle = "Enter your details.";
+  Msg = "Please enter your name and, optionally, a few words about yourself.";
+
+  \System\TextBox(Split + 8, BOT - 10, RHS, TOP + 17, Msg, \_DialogFont, 5);
+  GUITransform(0, 1, 1, 0,
+               1 - LHS, TOP + 55,
+               Split, 1 - (TOP + 10),
+               1                        { Scale whole                    },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(#Area, "Your Name", 4 { Text }, 1 { ID }, Trig { trigger },
+                                         1 { view }, 1 { Bevel }, 0 { VAlign }, 1 { AlignTitle },
+                                         Invalid {Min}, Invalid {Max}, 1 {PrivNotReqd}));
+  GUITransform(0, 1, 1, 0,
+               1 - LHS, TOP + 110,
+               Split, 1 - (TOP + 65),
+               1                        { Scale whole                    },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(#Description, "Describe yourself", 4 { Text }, 2 { ID }, Trig { trigger },
+                                         1 { view }, 1 { Bevel }, 0 { VAlign }, 1 { AlignTitle },
+                                         Invalid {Min}, Invalid {Max}, 1 {PrivNotReqd}));
+
+  If Move && PickValid(Trig != 0, 1);
+  [
+    IfThen(Move == Forward,
+      Engine\Trim(&Parms[#Area]);
+      Emsg = Invalid;
+      IfThen(PickValid(Parms[#Area] == "", 1),
+        Emsg = "I do need to know your name.";
+      );
+      Engine\Error(Emsg);
+    );
+    Move = 0;
+    ForceState(NextState);
+  ]
+]
+
+PickDate [
+  WTitle = Private ? "Pick a date" : Concat("Hi ", Parms[#Name], ", pick a date");
+  If !Valid(StartDate);
+  [
+    StartDate = Today() * 86400;
+  ]
+
+  Msg = "The date shown here is initially today - but you can change it.";
+  \System\TextBox(Split + 8, BOT - 10, RHS, TOP + 17, Msg, \_DialogFont, 5);
+
+  \System\Bevel(LHS, TOP + 55, MID - 68, TOP + 10, "Interesting Date");
+  \System\Edit(LHS + 8, TOP + 45, Mid - 76, Top + 23, "", Date(StartDate / 86400, 7), 0, Invalid, 3, 4);
+  If GUIButton(0, 1, 1, 0,
+               1 - (MID - 60), TOP + 47,
+               Split, 1 - (TOP + 17),
+               1, 0, 0, 1, 0,
+               68, 2, 0,
+               \ButtonFace, \ButtonHighlight, \ButtonShadow,
+               \ButtonTextColor,
+               0, 0,
+               "Change", "Change", \_DialogFont,
+               2, 1, 0);
+  [
+    ShowCalendar = 1;
+  ]
+  \DateSelector(ShowCalendar, LHS, TOP + 60, &StartDate);
+
+  If Move;
+  [
+    Move = 0;
+    ForceState(NextState);
+  ]
+]
+
+ValidTag [
+  WTitle = "Test for a valid tag name";
+  Msg = Concat("Type a name for the new Tag that you want to add.",
+               CRLF, CRLF,
+              "The name must be unique and must not contain any of the ",
+              "characters '", \IllegalPathChars, "'.");
+  \System\TextBox(Split + 8, BOT - 10, RHS, TOP + 17, Msg, \_DialogFont, 5);
+  GUITransform(0, 1, 1, 0,
+               1 - LHS, TOP + 55,
+               Split, 1 - (TOP + 10),
+               1                        { Scale whole                    },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(#Name, "New Tag name", 4 {Text}, 1 { ID }, Trig { trigger },
+                  Invalid {view}, Invalid {DrawBevel}, Invalid {VertAlign}, Invalid {AlignTitle},
+                  Invalid {Min}, Invalid {Max}, 1 {PrivNotReqd}));
+
+  If Move && PickValid(Trig != 0, 1);
+  [
+    IfThen(Move == Forward,
+      { New tag name typed - validate }
+      Engine\Trim(&Parms[#Name]);
+      NewTagName = Parms[#Name];
+      Emsg = Invalid;
+      IfThen(PickValid(NewTagName == "", 1),
+        Emsg = "A name is required.";
+      );
+      IfThen(Valid(FindVariable(NewTagName, \Code, 0, 0)) ||
+             Valid(FindVariable(NewTagName, \LibX\Database, 0, 0)),
+        Emsg = "This name already exists.";
+      );
+      IfThen(Locate(Parms[0], 0, \IllegalPathChars, 2 { Match set }) > -1 ||
+             PickValid(ValueType(Cast(Parms[#Name], 3)) =< 3, 0),
+        Emsg = "Illegal characters in Tag name.";
+      );
+      Engine\Error(Emsg);
+    );
+    Move = 0;
+    ForceState(NextState);
+  ]
+]
+{ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ }
+
+
+Finish [
+  { Final step - this state is required, and MUST be named "Finish" }
+  If Move;
+  [
+    Move = 0;
+    ForceState(NextState);
+  ]
+]
+
+{=============================================================================}
+{ The Wizard is now complete and you need to use the following states to      }
+{ carry out the Wizard's tasks.  Up until this point, no changes should       }
+{ have been made to anything outside of this Wizard.  However, all input      }
+{ must be fully validated because, once you reach here, there is no going     }
+{ back!                                                                       }
+{                                                                             }
+{=============================================================================}
+
+
+{ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv }
+{ As an example, this Template will go on to create or update a mythical Tag  }
+{ of type "SampleTag".                                                        }
+CreateAndSaveTag [
+  If 1 AllDone;
+  [
+    { Create or alter and save the tag }
+    \StartTag(\VTSDB, 3, "SampleTag", Parms);
+  ]
+]
+{ End of Sample finish states }
+{ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ }
+
+
+AllDone [
+  If !Cancel;
+  [
+    { All done now, lets get out of here }
+    Cancel = 1;
+  ]
+]
+
+{ End of TemplateWizard\Wizard }
+>
+
+{ End of TemplateWizard }
