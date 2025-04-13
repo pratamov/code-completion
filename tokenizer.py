@@ -154,7 +154,6 @@ def build_dataset(datapath="snippets", output_filepath="dataset.json"):
             with open(f"{datapath}/{filename}", "r", encoding="utf-8") as f:
                 text = f.read()
                 processed_text = process(text, remove_comments=True)
-                # processed_text = processed_text.replace("#<EOL>#", "#<EOL>#\n")
                 
                 with open(f"{datapath}/{filename}.TOKEN", "w", encoding="utf-8") as ff:
                     ff.write(processed_text)
