@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "date_created": "2025-04-28",
+  "model_type": "multi_property_lstm",
+  "word_vocab_size": 75,
+  "property_vocab_sizes": [
+    5
+  ],
+  "max_sequence_length": 83
+}
