@@ -142,6 +142,53 @@ def process(snippets: str, remove_comments: bool = False) -> str:
     snippets = " ".join(tokens)
     return sanitize(snippets)
 
+from typing import Tuple
+def tokenize(snippets: str) -> Tuple[str, str]:
+    token_pattern = r'^#(?:<([^>]+)>:)?([^#]+)#$'
+    processed_text = process(snippets, remove_comments=True)
+    values, namespaces = [], []
+    tokens = processed_text.split(" ")
+    for token in tokens:
+        match = re.fullmatch(token_pattern, token)
+        if match:
+            namespace, value = match.groups()
+            if value:
+                values.append(value)
+                namespaces.append(namespace or "ANY")
+    return " ".join(namespaces), " ".join(values)
+
+def tokenize_file(filepath="snippets/DemoDashboard2.SRC") -> List[Tuple[str, str]]:
+    token_pattern = r'^#(?:<([^>]+)>:)?([^#]+)#$'
+    with open(filepath, "r", encoding="utf-8") as f:
+        text = f.read()
+        processed_text = process(text, remove_comments=True)
+        
+        tokens = processed_text.split(" ")
+        for token in tokens:
+            match = re.fullmatch(token_pattern, token)
+            if match:
+                namespace, value = match.groups()
+                if value:
+                    values.append(value)
+                    namespaces.append(namespace or "ANY")
+                else: print(f"ERROR {token} -> <{namespace}>:{value}")
+                
+            if values and values[-1] == ";" and len(values) > 5:
+                dataset.append((
+                    " ".join(values),
+                    " ".join(namespaces)
+                ))
+                values = []
+                namespaces = []
+    
+        if values and dataset:
+            last_data = (
+                f"{dataset[-1][0]} {' '.join(values)}",
+                f"{dataset[-1][1]} {' '.join(namespaces)}"
+            )
+            dataset = dataset[:-1] + [last_data]
+    return dataset
+
 import os
 def build_dataset(datapath="snippets", output_filepath="dataset.json"):
     dataset = []
