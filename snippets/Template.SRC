@@ -448,7 +448,7 @@
   {*************************************************************************}
   { Custom object placement code                                            }
   {*************************************************************************}
-  { This code is commented out because we don't want to use this feature here
+  { This code is commented out because we don't want to use this feature here }
   PlaceObject Module          { The presence of this module declaration
                                 informs the system that this module will
                                 handle placement of the drawing object
@@ -482,7 +482,7 @@
                                 and create the parameter list string.
                                 This makes the Configure module code
                                 redundant.                                  };
-  }
+  
 ]
 
 TemplateInit [
@@ -1158,7 +1158,7 @@ Draw
   {*************************************************************************}
   { Prevent palcement with the mouse - put at a fixed screen location       }
   {*************************************************************************}
-  { This code is commented out because we don't want to use this feature here
+  { This code is commented out because we don't want to use this feature here }
   NoPlace = 1                 { Setting this variable to a 1 here will
                                 inform the VTS code that this drawing
                                 object should not be placed on the screen
@@ -1173,15 +1173,15 @@ Draw
   { existence is enough.  The PlaceObject module must be defined at the root }
   { of the point module for this to have any effect.                         }
   {**************************************************************************}
-  { This code is commented out because we don't want to use this feature here
+  { This code is commented out because we don't want to use this feature here }
   Shared PlaceObject;
-  }
+  
 
   Left   = 0                  { Where the AddObj should place this thing    };
   Top    = 0;
   Right  = 599;
   Bottom = 799;
-  }
+  
 
   { These variable are read by the VTS code at configuration time to determine
     the size of the GUITransform to place on the screen for this drawing
@@ -1195,7 +1195,7 @@ Draw
   {*************************************************************************}
   { Custom configuration module                                             }
   {*************************************************************************}
-  { This code is commented out because we don't want to use this feature here
+  { This code is commented out because we don't want to use this feature here }
   Configure Module            { The presence of this module declaration
                                 informs the VTS configuration code that the
                                 parameters for this drawing object should be
@@ -1203,7 +1203,7 @@ Draw
                                 than the Panel module code.  Unlike the
                                 Panel module, this module is called without
                                 any window.                                 };
-  }
+  
 
 ]
 
