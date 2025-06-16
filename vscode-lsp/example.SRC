@@ -1,0 +1,20 @@
+{========================== MyFile.src ============================}
+{ Describe code                                                    }
+{==================================================================}
+(
+    { PARAMETER }
+    
+)
+[
+    Bitmap = "Bitmaps\Tiles\Opaque\PinHoleBackground.png";
+    CONSTANT CVCLASS = 99;
+    Var1 = 42;
+    Title = "Dashboard1Label";
+]
+
+Main [
+    System.4BtnDialog(
+        \System\Warning_Icon,\GetPhrase("OKLabel"),
+        \GetPhrase("CancelLabel"),Invalid,Invalid,
+        "File exists !","Replace it ?",Invalid,OpenErrDlg );
+]
