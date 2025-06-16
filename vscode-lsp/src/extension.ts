@@ -9,6 +9,7 @@ const SERVER_PORT = 3001;
 interface ServerResponse {
     items: {
         insertText: string;
+        insertTextFormat: null | number;
         range: {
             start: { line: number; character: number };
             end: { line: number; character: number };
@@ -115,6 +116,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                     return {
                         insertText: new vscode.SnippetString(item.insertText),
+                        insertTextFormat: item.insertTextFormat,
                         range: range,
                         command: item.command ? {
                             command: item.command.command,
