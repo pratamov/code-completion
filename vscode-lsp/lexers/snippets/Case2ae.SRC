@@ -1,0 +1,10 @@
+{=========================== _ModVarParm\Case1Mod ============================}
+{=============================================================================}
+(
+)
+[
+  Variable1(22) { This is another comment };
+  Variable2(150) <:TestMetaData(1, "Hi", 3.14159):> Object<AnalogStatus, DigitalStatus, Modem> = 42.69 { This is a comment };
+  Variable3(0) { This is another comment };
+]
+{ End of _ModVarParm\Case1Mod }

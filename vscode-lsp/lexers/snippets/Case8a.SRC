@@ -1,0 +1,7 @@
+
+[
+  Variable(655) Object<AnalogStatus, DigitalStatus, Modem> = 42.69;
+]
+Main [
+  Return(Self);
+]

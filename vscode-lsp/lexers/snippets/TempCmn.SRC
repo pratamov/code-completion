@@ -1,0 +1,299 @@
+{=============================== Common ====================================}
+{ This module handles the common actions associated with all drwaing        }
+{ modules for this point.  It will be called by all external drawing        }
+{ modules.                                                                  }
+{===========================================================================}
+(
+  Left                        { Area occupied by the drawing object         };
+  Bottom;
+  Right;
+  Top;
+  DisableTrend                { Flag to disable trend windows               };
+  DisableNavigation           { Flag to disable navigator menu              };
+  DisableTooltip              { Flag to disable tool tips                   };
+)
+
+[
+  Control Module              { This module is a sample dialog which is
+                                opened when the operator left clicks on the
+                                rectangle.  The implementation of this
+                                module is left as an exercise to the reader };
+
+  ControlEnable = 0           { Set to true when the cotrol dialog is to
+                                appear.                                     };
+
+  X                           { Location of the control window on the screen};
+  Y;
+
+  xDelta                      { Delta variable                              };
+  yDelta                      { Delta variable                              };
+
+  Constant WIDTH  = 120       { Control dialog width                        };
+  Constant HEIGHT = 90        { Control dialog height                       };
+
+]
+
+InitCommon [
+  If 1 Common;
+  [
+    {***********************************************************************}
+    { Control window coordinates calculations section                       }
+    {***********************************************************************}
+
+     { Recalculate coordinates for the control dialog - puts the control
+       window to the right of the object unless that would be off the screen
+       in which case it is moved left of the object.                        }
+    X = CoordToPixel(Self(), Max(Left, Right), Max(Bottom, Top), 0);
+    Y = CoordToPixel(Self(), Max(Left, Right), Max(Bottom, Top), 1);
+    X += WIDTH;
+    Y += HEIGHT;
+    xDelta = X - VStatus(Self, 5);
+    yDelta = Y - VStatus(Self, 4);
+    X = CoordToPixel(Self(), 0, 0, 0);
+    Y = CoordToPixel(Self(), 0, 0, 1);
+
+    IfThen(xDelta > 0,
+      X -= xDelta
+    );
+
+    IfThen(yDelta > 0,
+      Y -= yDelta
+    );
+  ]
+]
+
+Common [
+  {*************************************************************************}
+  { "Tool Tip" note section                                                 }
+  {*************************************************************************}
+
+   { Set the target for a post-it note.  This should be the same as the
+     area for the GUI statements above.  If this point is contained within
+     another object and the container calls this Draw module, we do not
+     want this post-it note to display in that case.  This is typically
+     indicated by the calling container's drawing module adding one additonal
+     parameter to the list.  By detecting that the number of parameters
+     that the Draw is called with is not the same as the number of formal
+     parameters, we can prevent the post-it note from appearing.  This will
+     also prevent the post-it note from appearing during preview and placement
+     which is also desirable. }
+  WinTooltipCtrl(Left,
+                 Bottom,
+                 Right,
+                 Top,
+                 \WTTS_FLAG_TRACKINACTIVE + (PickValid(\NoBalloonTips, 0) ? 0 : \WTTS_FLAG_BALLOON),
+                 PickValid(Concat(\Name, \CRLF, \Description), \Name),
+                 Invalid, Invalid,
+                 \ShowTip && FormalParms(Caller(Self)) == NParm(Caller(Self))
+                          && !\NavActive && PickValid(! DisableTooltip, 1),
+                 \TipFont\Value);
+  {*************************************************************************}
+  { Navigator menu section                                                  }
+  {*************************************************************************}
+
+   { This call allows the user to right click on the object which brings up
+     a small Windows 95 desktop style menu which is intended to allow the
+     user to configure database and other parameters for the point.
+     Point parameters modified using the navigator will automatically be
+     written to the ODBC database (after Refresh is called).  Similar to the
+     post-it note, we want to prevent the activation of the Navigator during
+     preview mode or when it is called from a container's drawing module.
+     The first parameter for the Navigator is the enable which detects if we
+     are in preview mode or being called by a container module.  The navigator
+     is always disabled when the drawing object is in preview mode or when the
+     system is in editing mode.
+     Access to the Navigator is controlled by the security manager which has
+     a specific system bit set aside for this purpose :
+     (\SecurityManager\PrivBitConfigure).
+
+     The Navigator takes four significant parameters which describe the menu
+     items and their actions.  These parameters are appended to the end of
+     the end of the parameter list if groups of four. One group of four
+     defines one line in the menu.
+
+     NavContents - menu item name.  If the name is "--", a beveled ruling line
+                   is placed in the menu instead of text.
+     NavToggles  - A pointers to a value which will get logically inverted if
+                   the corresponding menu item is clicked upon.
+                   A check mark will appear in front of the menu item if the
+                   value of the variable pointed to is true.  Any element may
+                   be invalid if not used.  If the NavTabNums element is used
+                   to bring up the ConfigFolder, this value must be invalid.
+                   If the variable pointed to by this parameter is in a module
+                   other than the one pointed to by the Root parameter, the
+                   NavTabNums parameter contains the object value of that other
+                   point.
+
+                   This parameter can also serve a very different purpose if
+                   it contains an object value, in which case it will be point
+                   instance to use to launch the TabNums parameter actions
+                   within.  This can be used to allow direct access
+                   to sub-point parameter configuration folders or to launch
+                   modules within other contexts.  This cannot be used in
+                   combination with the TabNums parameter value being invalid
+                   since the TabLabels will not correspond to the correct
+                   point configuration dialog.
+     NavDisabled - A status value which allows you to disable (gray out)
+                   any menu item.  An invalid entry in this parameter is
+                   treated as the item being enabled.
+     NavTabNums  - An index which indicate which tab number on the
+                   point parameter configuration folder to display if the
+                   menu item is clicked upon.  If this value is invalid,
+                   the entire point configuration dialog window is shown.
+
+                   If this value is a text string, a module by that name will
+                   be launched within the scope of the calling point.  If the
+                   corresponding NavToggles entry has an object value, the
+                   module is launched within the scope of that object value.
+
+                   If the variable pointed to by the NavToggles parameter is
+                   in a module other than the one pointed to by the Root
+                   parameter, the NavTabNums parameter contains the object
+                   value of that other point.
+
+                   If the NavToggles parameter is a pointer to a parameter
+                   of a point which is not in the current point, this
+                   value must be the object value of the point where that
+                   toggled parameter exists.
+
+     To summarize, there are the following modes for these parameters:
+
+              Action                  NavToggles               NavTabNums
+     ----------------------------------------------------------------------------
+     Full Properties Dialog         Invalid              Invalid
+     Single Tab Prop. Dialog        Invalid              Tab Number
+     Toggle Parm in This Point      Ptr to Parm          Invalid
+     Toggle Parm in Another Point   Ptr to Parm          Obj Value of Other Point
+     Launch Module in Point Scope   Invalid              Module Name (Text)
+     Launch Module in Other Scope   Scope to Run Within  Module Name (Text)
+                                                                            }
+
+  \Navigator(NParm(Caller(Self)) == FormalParms(Caller(Self))
+                   && PickValid(! DisableNavigation, 1) { Opening condition for the folder },
+             Left, Bottom, Right, Top         { Target area for opening - same as
+                                                the GUI statement area.          },
+             { Menu line 1 } "Help",          \CODE, "HelpLaunch", Invalid,
+             { Menu line 2 } "--",            Invalid,          0, Invalid,
+             { Menu line 3 } "Alarm Inhibit", &(\AlarmInhibit), 0, Invalid,
+             { Menu line 4 } "Questionable",  &(\Questionable), 0, Invalid,
+             { Menu line 5 } "--",            Invalid,          0, Invalid,
+             { Menu line 6 } "Properties",    Invalid,          0, Invalid);
+
+
+  {*************************************************************************}
+  { Trend window pop-up section                                             }
+  {*************************************************************************}
+
+   { This code will cause a trend window to pop-up when the operator left
+     clicks on the object.  This code is generally incompatible with the
+     control dialog code which uses the same mouse button.
+     The first four parameters should match the area of the GUI drawing
+     statements above because they specify the target area for the mouse.
+     The last parameter is the object value of this point instance.
+     This function will automatically be disabled in editing mode.
+     This will add a pen the to plot which will trend the "Value" variable
+     in this point.                                                         }
+  \PkTrend(Left, Bottom, Right, Top, \Root,
+           NParm(Caller(Self)) == FormalParms(Caller(Self)) && PickValid(! DisableTrend, 1)
+            { Disable when in called from a container's draw            });
+
+  {*************************************************************************}
+  { Pup-up control dialog section                                           }
+  {*************************************************************************}
+
+   { This module displays a yellow highlight around the area when the operator
+     moves his/her mouse across the object.  The box will flash when the
+     control dialog box is seleted and open.                                }
+  \HotBox(ControlEnable { Flash when the control dialog is open },
+          Left, Bottom, Right, Top,
+          FormalParms(Caller(Self)) == NParm(Caller(Self)) &&
+          !\Editing && \SecurityManager\SecurityCheck(\TemplateSecurityBit, 1));
+
+   { If the user opens the tool bar make sure the control dialog is closed }
+   { The security manager check will close the dialog if the user does not
+     have access to bit 16 (just an example).  Any bit number could be used. }
+  If ControlEnable && (\Editing ||
+                       !\SecurityManager\SecurityCheck(\TemplateSecurityBit, 1));
+  [
+    ControlEnable = 0;
+  ]
+
+   { Open the control dialog if the user left clicks on the object, and
+     he/she has security clearance and it's not in edit mode.               }
+  If Pick(Left, Bottom, Right, Top,
+          ! ControlEnable && FormalParms(Caller(Self)) == NParm(Caller(Self)) &&
+          !\Editing && \SecurityManager\SecurityCheck(16, 1) ? 4 : 0);
+  [
+     { Start up the control dialog box }
+    ControlEnable = 1;
+  ]
+
+  Window(X, Y,                           { Upper left corner   }
+         WIDTH, HEIGHT,                  { View area           }
+         WIDTH, HEIGHT,                  { Virtual area        }
+         Control(),
+          {5432109876543210}
+         0b0010010100001111,
+         Concat(\Root\Name, " ", \ControlDialogTitle { Comes from Settings.Dynamic }),
+         \DialogBGColor, ControlEnable);
+]
+
+<
+{============================== Common\Control =============================}
+{ This module draws the contents of the pop-up control dialog box.          }
+{ This code will be highly customized for each application.                 }
+{===========================================================================}
+Control
+
+Control [
+   { The buttons use a standard size, color and font to be consistent
+     throughout the applicaton                                              }
+   { Center the buttons on the dialog box }
+
+  {**************************************************************************}
+  { OK Button                                                                }
+  {**************************************************************************}
+
+  If GUIButton(0, 1, 1, 0                         { Outline                        },
+               1 - ((WIDTH - \ButtonWidth { Standard width for a button }) / 2),
+               10 + \ButtonHeight { Standard button height },
+               (WIDTH + \ButtonWidth) / 2,
+               10,
+               1, 0, 0                            { No overall scaling or movement },
+               1, 0, 56+64, 2, 0                  { Visible; selectable            },
+               \ButtonFace, \ButtonHighlight, \ButtonShadow, \ButtonTextColor
+                                                  { Colors                         },
+               0, 0                               { Standard Windows button        },
+                { OKLabel is a standard PhraseID for the OK string }
+               \GetPhrase("OKLabel"), \GetPhrase("OKLabel"), \_DialogFont   { Labels                     },
+               1, 2, 3                            { No variable assignment         });
+  [
+    ControlEnable = 0  { Close the window };
+  ]
+
+  {**************************************************************************}
+  { Cancel Button                                                            }
+  {**************************************************************************}
+
+  If GUIButton(0, 1, 1, 0                         { Outline                        },
+               1 - ((WIDTH - \ButtonWidth { Standard width for a button }) / 2),
+               20 + 2 * \ButtonHeight { Standard button height },
+               (WIDTH + \ButtonWidth) / 2,
+               20 + \ButtonHeight,
+               1, 0, 0                            { No overall scaling or movement },
+               1, 0, 56+64, 2, 0                  { Visible; selectable            },
+               \ButtonFace, \ButtonHighlight, \ButtonShadow, \ButtonTextColor
+                                                  { Colors                         },
+               0, 0                               { Standard Windows button        },
+                { CancelLabel is a standard PhraseID for the Cancel string }
+               \GetPhrase("CancelLabel"), \GetPhrase("CancelLabel"), \_DialogFont { Labels                     },
+               1, 2, 3                            { No variable assignment         });
+  [
+    ControlEnable = 0  { Close the window };
+  ]
+]
+
+{ End of Common\Control }
+>
+
+{ End of Common }

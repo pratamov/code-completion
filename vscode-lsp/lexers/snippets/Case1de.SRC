@@ -1,0 +1,11 @@
+{=========================== _ModVarParm\Case1Mod ============================}
+{=============================================================================}
+(
+)
+[
+  Variable1(0);
+  Shared Variable2(0);
+  Variable3(42);
+  Constant Variable4(69) = "Mary had a little wooly one";
+]
+{ End of _ModVarParm\Case1Mod }

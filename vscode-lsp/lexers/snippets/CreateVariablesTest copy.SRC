@@ -1,0 +1,800 @@
+{============================= _CreateVariables ==============================}
+{=============================================================================}
+(
+  Framework;
+  Owner;
+)
+[
+  {***** SUX - I have to re-declare here to avoid load errors in TestFramework. *****}
+  VarInfo Struct [
+    Name                    { Name of the variable                            };
+    Class                   { Its class                                       };
+    Default                 { Default value                                   };
+    Attribs                 { Attributes. 0(none), 2(shared) or 32(constant)  };
+    TypeRestrict            { Type restriction, Either a supported ValueType
+                              integer or a struct ObjectVariableType          };
+    MetaData                { Value holding metadata. Can be simple or struct };
+    Comment                 { Text comment                                    };
+    ParmPosition            { Position for parameter if var is a param        };
+  ];
+  VariableType Struct [
+    Type;
+  ];
+  ObjectVariableType : VariableType Struct [
+    ModuleNameList;
+  ];
+  TestMetaData Struct [
+    First;
+    Second;
+    Third;
+  ];
+  Constant #ERR_OK          = 0     { Success                                 };
+  Constant #ERR_BADPARM     = 1     { Bad parameter                           };
+  Constant #ERR_CANTEDIT    = 2     { Unable to edit module/source file       };
+  Constant #ERR_PARMNUMERR  = 3     { Bad parameter number                    };
+  Constant #ERR_ADDVARERR   = 4     { AddVariable failed                      };
+
+  [ (FIXTURE)
+    TestFixture;
+  ]
+
+  BackupTestMod Module;
+  RestoreTestMod Module;
+  CompareTestMod Module;
+  Case1Mod  Module "Case1.SRC"  { Test source modules          };
+  Case4Mod Module "Case4.SRC";
+  Case5Mod Module "Case5.SRC";
+  CallCase5 Module "CallCase5.SRC";
+  Case6Mod Module "Case6.SRC";
+  Case7AMod Module "Case7a.SRC";
+  Case7BMod Module "Case7b.SRC";
+  Case7CMod Module "Case7c.SRC";
+  Case7DMod Module "Case7d.SRC";
+  Case8AMod Module "Case8a.SRC";
+  Case8BMod Module "Case8b.SRC";
+  Case9AMod Module "Case9a.SRC";
+
+  CONSTANT CVCLASS = 99             { Same Constant as in fixture             };
+  CONSTANT LIBRARIES = 0xFF01;
+  CONSTANT GRAPHICS   = 0xFF02;
+  MUT                               { Module value of Case1Mod                };
+  VarData                           { Array of var data for var creation      };
+  VarType                           { Var type restriction data               };
+  Drive                             { Drive for test case modules             };
+  FullPath                          { Path for test case modules              };
+  Obj                               { Object value of test module             };
+  MUTObj                            { Object value of running MUT             };
+  GetPhrase                         { Container for the GetPhrase module      };
+]
+
+Init [
+  If 1 Errors;
+  [
+    SplitPath(ModuleFileName(Self()), Drive, FullPath, 0, 0);
+    MUT       = BackupTestMod("Case1Mod");
+    GetPhrase = Framework\GetPhrase;
+  ]
+]
+
+Errors [
+  If 1 Case1A;
+  [
+    Framework\AssertEqual(#ERR_BADPARM, Owner(), "No parms");
+    Framework\AssertEqual(#ERR_BADPARM, Owner(Invalid, 2), "No Module");
+    Framework\AssertEqual(#ERR_BADPARM, Owner(2, 2), "Bad Module");
+    VarData = New(1);
+    VarData[0] = VarInfo(Invalid, 0, Invalid, 0);
+    SetFileAttribs(ModuleFilename(MUT), 1{read-only});
+    Framework\AssertEqual(#ERR_CANTEDIT, Owner(MUT, VarData), "Can't edit");
+    SetFileAttribs(ModuleFilename(MUT), 0{normal});
+    Framework\AssertEqual(#ERR_ADDVARERR, Owner(MUT, VarData), "Bad var name");
+  ]
+]
+
+Case1A [
+  If 1 Case1B;
+  [
+    VarData = New(1);
+    VarData[0] = VarInfo("Variable1", 0, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add 1st Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, "Case1ae", "Add 1st Var");
+
+    Framework\AssertEqual(#ERR_OK, Owner(MUT), "No VarData");
+    CompareTestMod(MUT, "Variable1", 0, 0, "Case1ae", "No VarData");
+    Framework\AssertEqual(1, ArraySize(ListVars(MUT, "*", 0, 65535, 0, 0, 0, 0, 0)), "No VarData - still just one variable");
+  ]
+]
+
+Case1B [
+  If 1 Case1C;
+  [
+    VarData[0] = VarInfo("Variable2", 0, Invalid, 2);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add 2nd Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add 2nd Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, "Case1be", "Add 2nd Var");
+  ]
+]
+
+Case1C [
+  If 1 Case1D;
+  [
+    VarData[0] = VarInfo("Variable3", 42, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 42 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 42 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 42 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, "Case1ce", "Add class 42 Var");
+  ]
+]
+
+Case1D [
+  If 1 Case1E;
+  [
+    VarData[0] = VarInfo("Variable4", 69, "Mary had a little wooly one", 32);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 69 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 69 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 69 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Add class 69 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, "Case1de", "Add class 69 Var", Invalid, Invalid, "Mary had a little wooly one");
+  ]
+]
+
+Case1E [
+  If 1 Case1F;
+  [
+    VarData[0] = VarInfo("Variable5", 65532, 42.69, 0, 3);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 65532 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 65532 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 65532 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Add class 65532 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Add class 65532 Var", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, "Case1ee", "Add class 65532 Var", 3, Invalid, 42.69);
+  ]
+]
+
+Case1F [
+  If 1 Case1G;
+  [
+    VarType = New(3);
+    VarType[0] = "AnalogStatus";
+    VarType[1] = "DigitalStatus";
+    VarType[2] = "Modem";
+    VarData[0] = VarInfo("Variable6", 655, 42.69, 0,
+                         ObjectVariableType(7, VarType));
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 655 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 655 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 655 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Add class 655 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Add class 655 Var", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, Invalid, "Add class 655 Var", 3, Invalid, 42.69);
+    CompareTestMod(MUT, "Variable6", 655, 0, "Case1fe", "Add class 655 Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+  ]
+]
+
+Case1G [
+  If 1 Case1H;
+  [
+    VarData[0] = VarInfo("Variable7", 5, 42.69, 0,
+                         ObjectVariableType(7, VarType),
+                         "Meta String");
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 5 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 5 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 5 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Add class 5 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Add class 5 Var", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, Invalid, "Add class 5 Var", 3, Invalid, 42.69);
+    CompareTestMod(MUT, "Variable6", 655, 0, Invalid, "Add class 5 Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+    CompareTestMod(MUT, "Variable7", 5, 0, "Case1ge", "Add class 5 Var",
+                   ObjectVariableType(7, VarType), "Meta String", 42.69);
+  ]
+]
+
+Case1H [
+  If 1 Case1I;
+  [
+    VarData[0] = VarInfo("Variable8", 15, 1234, 0,
+                         7,
+                         TestMetaData(1, "Hi", 3.14159));
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 15 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 15 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 15 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Add class 15 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Add class 15 Var", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, Invalid, "Add class 15 Var", 3, Invalid, 42.69);
+    CompareTestMod(MUT, "Variable6", 655, 0, Invalid, "Add class 15 Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+    CompareTestMod(MUT, "Variable7", 5, 0, Invalid, "Add class 15 Var",
+                   ObjectVariableType(7, VarType), "Meta String", 42.69);
+    CompareTestMod(MUT, "Variable8", 15, 0, "Case1he", "Add class 15 Var",
+                   7, TestMetaData(1, "Hi", 3.14159), 1234);
+  ]
+]
+
+Case1I [
+  If 1 Case1J;
+  [
+    VarData[0] = VarInfo("Variable9", 150, 42.69, 0,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment");
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 150 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Add class 150 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Add class 150 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Add class 150 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Add class 150 Var", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, Invalid, "Add class 150 Var", 3, Invalid, 42.69);
+    CompareTestMod(MUT, "Variable6", 655, 0, Invalid, "Add class 150 Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+    CompareTestMod(MUT, "Variable7", 5, 0, Invalid, "Add class 150 Var",
+                   ObjectVariableType(7, VarType), "Meta String", 42.69);
+    CompareTestMod(MUT, "Variable8", 15, 0, Invalid, "Add class 150 Var",
+                   7, TestMetaData(1, "Hi", 3.14159), 1234);
+    CompareTestMod(MUT, "Variable9", 150, 0, "Case1ie", "Add class 150 Var",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159), 42.69);
+  ]
+]
+
+Case1J [
+  If 1 Case1K;
+  [
+    VarData[0] = VarInfo("Variable7", 22, Invalid, 0, Invalid, Invalid, "This is another comment");
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Replace class 22 Var");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Replace class 22 Var");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Replace class 22 Var");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Replace class 22 Var");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Add class 150 Var", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, Invalid, "Add class 150 Var", 3, Invalid, 42.69);
+    CompareTestMod(MUT, "Variable6", 655, 0, Invalid, "Add class 150 Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+    CompareTestMod(MUT, "Variable7", 22, 0, Invalid, "Replace class 22 Var");
+    CompareTestMod(MUT, "Variable8", 15, 0, Invalid, "Add class 150 Var",
+                   7, TestMetaData(1, "Hi", 3.14159), 1234);
+    CompareTestMod(MUT, "Variable9", 150, 0, "Case1je", "Add class 150 Var",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159), 42.69);
+  ]
+]
+
+Case1K [
+  If 1 Case1L;
+  [
+    VarData[0] = VarInfo("Variable7", "CVCLASS", Invalid, 0, Invalid, Invalid, "This is another comment");
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Replace class using 'CVCLASS'");
+    CompareTestMod(MUT, "Variable1", 0, 0, Invalid, "Replace class using 'CVCLASS'");
+    CompareTestMod(MUT, "Variable2", 0, 2, Invalid, "Replace class using 'CVCLASS'");
+    CompareTestMod(MUT, "Variable3", 42, 0, Invalid, "Replace class using 'CVCLASS'");
+    CompareTestMod(MUT, "Variable4", 69, 34, Invalid, "Replace class using 'CVCLASS'", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable5", 65532, 0, Invalid, "Replace class using 'CVCLASS'", 3, Invalid, 42.69);
+    CompareTestMod(MUT, "Variable6", 655, 0, Invalid, "Replace class using 'CVCLASS'",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+    CompareTestMod(MUT, "Variable7", \CVCLASS, 0, Invalid, "Replace class using 'CVCLASS'");
+    CompareTestMod(MUT, "Variable8", 15, 0, Invalid, "Replace class using 'CVCLASS'",
+                   7, TestMetaData(1, "Hi", 3.14159), 1234);
+    CompareTestMod(MUT, "Variable9", 150, 0, "Case1ke", "Replace class using 'CVCLASS'",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159), 42.69);
+  ]
+]
+
+Case1L [
+  If 1 Restore1;
+  [
+    AddVariable(MUT, "TempToRealVar", 0, 256 {temp}, 0, 0, 0, 0, 0, 0);
+    VarData[0] = VarInfo("TempToRealVar", 0, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add variable where temp var existed");
+    CompareTestMod(MUT, "TempToRealVar", 0, 0, "Case1le", "Add variable where temp var existed");
+  ]
+]
+
+Restore1 [
+  If RestoreTestMod(MUT) Case2A;
+]
+
+Case2A [
+  If 1 Case2B;
+  [
+    MUT = BackupTestMod("Case1Mod");
+    VarData = New(3);
+    VarData[0] = VarInfo("Variable1", 22, Invalid, 0, Invalid, Invalid, "This is another comment");
+    VarData[1] = VarInfo("Variable2", 150, 42.69, 0,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment");
+    VarData[2] = VarInfo("Variable3", 0, Invalid, 0, Invalid, Invalid, "This is another comment");
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Insert multiple vars");
+    CompareTestMod(MUT, "Variable1", 22, 0, Invalid, "Insert multiple vars (22)");
+    CompareTestMod(MUT, "Variable2", 150, 0, Invalid, "Insert multiple vars (150)",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159), 42.69);
+    CompareTestMod(MUT, "Variable3", 0, 0, "Case2ae", "Insert multiple vars (0)");
+  ]
+]
+
+Case2B [
+  If 1 Restore2;
+  [
+    VarData[1] = VarInfo("Variable1", 150, 42.69, 0,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment");
+    VarData[0] = VarInfo("Variable2", 22, Invalid, 0, Invalid, Invalid, "This is another comment");
+    VarData[2] = VarInfo("Variable3", 0, Invalid, 0, Invalid, Invalid, "This is another comment");
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Modify multiple vars");
+    CompareTestMod(MUT, "Variable1", 150, 0, Invalid, "Modify multiple vars (150)",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159), 42.69);
+    CompareTestMod(MUT, "Variable2", 22, 0, Invalid, "Modify multiple vars (22)");
+    CompareTestMod(MUT, "Variable3", 0, 0, "Case2be", "Modify multiple vars (0)");
+  ]
+]
+
+Restore2 [
+  If RestoreTestMod(MUT) Case3;
+]
+
+Case3 [
+  If 1 Case3A;
+  [
+    MUT = BackupTestMod("Case1Mod");
+    VarData = New(1);
+    VarData[0] = VarInfo("Param1", 0, Invalid, 0, Invalid, Invalid, Invalid, -1);
+    Framework\AssertEqual(#ERR_PARMNUMERR, Owner(MUT, VarData), "Param num error 1");
+    VarData[0]\ParmPosition = 1;
+    Framework\AssertEqual(#ERR_PARMNUMERR, Owner(MUT, VarData), "Param num error 2");
+  ]
+]
+
+Case3A [
+  If 1 Case3B;
+  [
+    VarData[0] = VarInfo("Param1", 0, Invalid, 0, Invalid, Invalid, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add 1st Param");
+    CompareTestMod(MUT, "Param1", 0, 16, "Case3ae", "Add 1st Param");
+  ]
+]
+
+Case3B [
+  If 1 Case3C;
+  [
+    VarData[0]\ParmPosition = 2;
+    Framework\AssertEqual(#ERR_PARMNUMERR, Owner(MUT, VarData), "Param num error 3");
+    VarData[0] = VarInfo("Param2", 0, Invalid, 16, Invalid, Invalid, Invalid, 1);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add 2nd Param");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Add 2nd Param");
+    CompareTestMod(MUT, "Param2", 0, 16, "Case3be", "Add 2nd Param");
+  ]
+]
+
+Case3C [
+  If 1 Case3D;
+  [
+    VarData[0] = VarInfo("Param3", 0, Invalid, 0, Invalid, Invalid, Invalid, 1);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add new 2nd Param");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Add new 2nd Param");
+    CompareTestMod(MUT, "Param2", 0, 16, Invalid, "Add new 2nd Param");
+    CompareTestMod(MUT, "Param3", 0, 16, "Case3ce", "Add new 2nd Param");
+  ]
+]
+
+Case3D [
+  If 1 Case3E;
+  [
+    VarData[0] = VarInfo("Param4", 0, Invalid, 0, Invalid, Invalid, Invalid, 3);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add 4th Param");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Add 4th Param");
+    CompareTestMod(MUT, "Param2", 0, 16, Invalid, "Add 4th Param");
+    CompareTestMod(MUT, "Param3", 0, 16, Invalid, "Add 4th Param");
+    CompareTestMod(MUT, "Param4", 0, 16, "Case3de", "Add 4th Param");
+  ]
+]
+
+Case3E [
+  If 1 Restore3;
+  [
+    VarData[0] = VarInfo("Param5", 150, 42.69, 16,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment", 4);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add 5th Param");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Add 5th Param");
+    CompareTestMod(MUT, "Param2", 0, 16, Invalid, "Add 5th Param");
+    CompareTestMod(MUT, "Param3", 0, 16, Invalid, "Add 5th Param");
+    CompareTestMod(MUT, "Param4", 0, 16, Invalid, "Add 5th Param");
+    CompareTestMod(MUT, "Param5", 0, 16, "Case3ee", "Add 5th Param",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159));
+  ]
+]
+
+Restore3 [
+  If RestoreTestMod(MUT) Case4;
+]
+
+Case4 [
+  If 1 Restore4;
+  [
+    MUT = BackupTestMod("Case4Mod");
+    VarData = New(1);
+    VarData[0] = VarInfo("Variable1", 72, "Mary had a little wooly one", 32);
+    Case4Mod();
+    Case4Mod();
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 72 Var");
+    CompareTestMod(MUT, "Variable1", 72, 34, "Case4ae", "Add class 72 Var", Invalid, Invalid, "Mary had a little wooly one");
+    FrameWork\AssertEqual("Mary had a little wooly one", GetInstance(MUT, 0)\Variable1, "Instance 0 value");
+    FrameWork\AssertEqual("Mary had a little wooly one", GetInstance(MUT, 1)\Variable1, "Instance 1 value");
+    Slay(GetInstance(MUT, 0), 0);
+    Slay(GetInstance(MUT, 0), 0);
+  ]
+]
+
+Restore4 [
+  If RestoreTestMod(MUT) Case5;
+]
+
+Case5 [
+  If 1 WaitCase5;
+  [
+    MUT = BackupTestMod("Case5Mod");
+    Obj = CallCase5(&MUTObj);
+  ]
+]
+
+WaitCase5 [
+  If Valid(MUTObj) Restore5;
+  [
+    DeleteVariable(FindVariable("Param2", MUT, 0, 0));
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Delete Param2");
+    CompareTestMod(MUT, "Param3", 0, 16, "Case5ae", "Delete Param2");
+    VarData[0] = VarInfo("Param2", 150, 42.69, 16,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment", 1);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Re-add Param2");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Re-add Param2");
+    CompareTestMod(MUT, "Param2", 0, 16, Invalid, "Re-add Param2",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159));
+    CompareTestMod(MUT, "Param3", 0, 16, "Case5be", "Re-add Param2");
+    VarData = New(4);
+    VarData[0] = VarInfo("Param1", 150, 42.69, 16,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment", 1);
+    VarData[1] = VarInfo("Variable1", 72, "Mary had a little wooly one", 32);
+    VarData[2] = VarInfo("Param2", 75, Invalid, 16,
+                         3,
+                         "Meta String",
+                         "This is a comment", 0);
+    VarData[3] = VarInfo("Variable2", 69, "Mary had a very ""wooly"" one", 32);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Modify ref Param1");
+    CompareTestMod(MUT, "Variable1", 72, 34, Invalid, "Modify ref Param1", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable2", 69, 34, Invalid, "Modify ref Param1", Invalid, Invalid, "Mary had a very ""wooly"" one");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Modify ref Param1",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159));
+    CompareTestMod(MUT, "Param2", 0, 16, Invalid, "Modify ref Param1",
+                   3, "Meta String");
+    CompareTestMod(MUT, "Param3", 0, 16, "Case5ce", "Modify ref Param1");
+    VarData = New(3);
+    VarData[0] = VarInfo("Param1", 150, 42.69, 16,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment", 1);
+    VarData[1] = VarInfo("Param2", 75, Invalid, 16,
+                         3,
+                         "Meta String",
+                         "This is a comment", 0);
+    VarData[2] = VarInfo("Param3", Invalid, Invalid, Invalid, Invalid, Invalid, Invalid, 2);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Modify all Params");
+    CompareTestMod(MUT, "Variable1", 72, 34, Invalid, "Modify all Params", Invalid, Invalid, "Mary had a little wooly one");
+    CompareTestMod(MUT, "Variable2", 69, 34, Invalid, "Modify all Params", Invalid, Invalid, "Mary had a very ""wooly"" one");
+    CompareTestMod(MUT, "Param1", 0, 16, Invalid, "Modify all Params",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159));
+    CompareTestMod(MUT, "Param2", 0, 16, Invalid, "Modify all Params",
+                   3, "Meta String");
+    CompareTestMod(MUT, "Param3", 0, 16, "Case5ce", "Modify all Params");
+    Slay(Obj, 0);
+  ]
+]
+
+Restore5 [
+  If RestoreTestMod(MUT) Case6A;
+]
+
+Case6A [
+  If 1 Case6B;
+  [
+    MUT = BackupTestMod("Case6Mod");
+    VarData = New(1);
+    VarData[0] = VarInfo("Variable1", 0, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add Var to empty module");
+    CompareTestMod(MUT, "Variable1", 0, 0, "Case6ae", "Add Var to empty module");
+  ]
+]
+
+Case6B [
+  If 1 Restore6A;
+  [
+    VarData[0] = VarInfo("Param1", 0, Invalid, 0, Invalid, Invalid, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add Param to var only module");
+    CompareTestMod(MUT, "Param1", 0, 16, "Case6be", "Add Param to var only module");
+  ]
+]
+
+Restore6A [
+  If RestoreTestMod(MUT) Case6C;
+]
+
+Case6C [
+  If 1 Restore6B;
+  [
+    MUT = BackupTestMod("Case6Mod");
+    VarData[0] = VarInfo("Param1", 0, Invalid, 0, Invalid, Invalid, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add Param to empty module");
+    CompareTestMod(MUT, "Param1", 0, 16, "Case6ce", "Add Param to empty module");
+  ]
+]
+
+Restore6B [
+  If RestoreTestMod(MUT) Case7A;
+]
+
+Case7A [
+  If 1 Restore7A;
+  [
+    MUT = BackupTestMod("Case7AMod");
+    VarData[0] = VarInfo("MyLib", "CVCLASS", Invalid, 2);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Replace MyLib (a) result");
+    CompareTestMod(MUT, "MyLib", \CVCLASS, 2, "Case7ae", "Replace MyLib (a) Var & Src");
+  ]
+]
+
+Restore7A [
+  If RestoreTestMod(MUT) Case7B;
+]
+
+Case7B [
+  If 1 Restore7B;
+  [
+    MUT = BackupTestMod("Case7BMod");
+    VarData[0] = VarInfo("MyLib", "LIBRARIES", Invalid, 2);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Replace MyLib (b) result");
+    CompareTestMod(MUT, "MyLib", \LIBRARIES, 2, "Case7be", "Replace MyLib (b) Var & Src");
+    CompareTestMod(MUT, "OtherLib", \CVCLASS, 2, Invalid, "Untouched OtherLib (b) Var & Src");
+  ]
+]
+
+Restore7B [
+  If RestoreTestMod(MUT) Case7C;
+]
+
+Case7C [
+  If 1 Restore7C;
+  [
+    MUT = BackupTestMod("Case7CMod"); { Has deliberate odd, but valid syntax }
+    VarData[0] = VarInfo("MyLib", "LIBRARIES", Invalid, 2);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Replace MyLib (c) result");
+    CompareTestMod(MUT, "MyLib", \LIBRARIES, 2, "Case7ce", "Replace MyLib (c) Var & Src");
+    CompareTestMod(MUT, "OtherLib", \CVCLASS, 2, Invalid, "Untouched OtherLib (c) Var & Src");
+  ]
+]
+
+Restore7C [
+  If RestoreTestMod(MUT) Case7D;
+]
+
+Case7D [
+  If 1 Restore7D;
+  [
+    MUT = BackupTestMod("Case7DMod");
+    VarData[0] = VarInfo("MyLib", "LIBRARIES", Invalid, 2);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Replace MyLib (d) result");
+    CompareTestMod(MUT, "MyLib", \LIBRARIES, 2, "Case7de", "Replace MyLib (d) Var & Src");
+    CompareTestMod(MUT, "OtherLib", \CVCLASS, 2, Invalid, "Untouched OtherLib (d) Var & Src");
+  ]
+]
+
+Restore7D [
+  If RestoreTestMod(MUT) Case8A;
+]
+
+Case8A [
+  If 1 Restore8A;
+  [
+    MUT = BackupTestMod("Case8AMod");
+    { Add a temporary variable }
+    AddVariable(MUT, "Temp", 0, 256{temp}, 0, 0, 0, 0, Invalid, Invalid);
+    { Add a parameter block and replace the sole variable }
+    VarData = New(2);
+    VarType = New(3);
+    VarType[0] = "AnalogStatus";
+    VarType[1] = "DigitalStatus";
+    VarType[2] = "Modem";
+    VarData[0] = VarInfo("Variable", 655, 42.69, 0,
+                         ObjectVariableType(7, VarType));
+    VarData[1] = VarInfo("Param", 150, 42.69, 16,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment", 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add parm + var block result");
+    CompareTestMod(MUT, "Param", 0, 16, "Case8ae", "Add parm + var block Param",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159));
+    CompareTestMod(MUT, "Variable", 655, 0, Invalid, "Add parm + var block Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+  ]
+]
+
+Restore8A [
+  If RestoreTestMod(MUT) Case8B;
+]
+
+Case8B [
+  If 1 Restore8B;
+  [
+    MUT = BackupTestMod("Case8BMod");
+    { Add a temporary variable }
+    AddVariable(MUT, "Temp", 0, 256{temp}, 0, 0, 0, 0, Invalid, Invalid);
+    { Add a parameter block and replace the sole variable }
+    VarData = New(2);
+    VarType = New(3);
+    VarType[0] = "AnalogStatus";
+    VarType[1] = "DigitalStatus";
+    VarType[2] = "Modem";
+    VarData[0] = VarInfo("Variable", 655, 42.69, 0,
+                         ObjectVariableType(7, VarType));
+    VarData[1] = VarInfo("Param", 150, 42.69, 16,
+                         ObjectVariableType(7, VarType),
+                         TestMetaData(1, "Hi", 3.14159),
+                         "This is a comment", 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add parm + var block result");
+    CompareTestMod(MUT, "Param", 0, 16, "Case8ae", "Add parm + var block Param",
+                   ObjectVariableType(7, VarType), TestMetaData(1, "Hi", 3.14159));
+    CompareTestMod(MUT, "Variable", 655, 0, Invalid, "Add parm + var block Var",
+                   ObjectVariableType(7, VarType), Invalid, 42.69);
+  ]
+]
+
+Restore8B [
+  If RestoreTestMod(MUT) Case9A;
+]
+
+Case9A [
+  If 1 Restore9A;
+  [
+    MUT = BackupTestMod("Case9AMod");
+    VarData = New(1);
+    VarData[0] = VarInfo("Var3", 0, Invalid, 0);
+    Framework\AssertEqual(#ERR_OK, Owner(MUT, VarData), "Add class 0 variable after class block");
+    CompareTestMod(MUT, "Var3", 0, 0, "Case9ae", "Add class 0 variable after class block");
+  ]
+]
+
+Restore9A [
+  If RestoreTestMod(MUT) Done;
+]
+
+Done [
+  If 1;
+  [
+    Slay();
+  ]
+]
+
+<
+{======================= _CreateVariables\BackupTestMod ======================}
+{=============================================================================}
+BackupTestMod
+(
+  ModuleName;
+)
+[
+  TestMod;
+  ModFName;
+  BackupFName;
+]
+
+BackupTestMod [
+  If 1;
+  [
+    TestMod = FindVariable(ModuleName, Caller(Self()), 0, 0);
+    { This Resync is necessary in order for the tests to pass on an installed version
+      of VTS. The installer does not maintain the timestamps of the source files
+      correctly so without this Resync the modules appear to be out-of-sync. }
+    ResyncDoc(TestMod);
+    ModFName = ModuleFilename(TestMod);
+    BackupFName = Concat(ModFName, ".OLD");
+    FWrite(BackupFName, 3, 0, "");
+    BlockWrite(FileStream(BackupFName), FileStream(ModFName));
+    Return(TestMod);
+  ]
+]
+
+{ End of _CreateVariables\BackupTestMod }
+>
+
+<
+{====================== _CreateVariables\CompareTestMod ======================}
+{=============================================================================}
+CompareTestMod
+(
+  TestMod;
+  VariableName;
+  ExpectedClass;
+  ExpAttribs;
+  ExpModuleName;
+  Message;
+  VariableType;
+  VarMetaData;
+  DefaultValue;
+)
+[
+  ModFName;
+  ExpFName;
+  ActualStream;
+  ExpectedStream;
+  ActualVar;
+]
+
+CompareTestMod [
+  If 1;
+  [
+    ActualVar = FindVariable(VariableName, TestMod, 0, 0);
+    {***** Test the variable exists in the module *****}
+    Framework\AssertTRUE(Valid(ActualVar), Concat("Var present ", Message));
+    {***** Test the variable is of the correct class *****}
+    Framework\AssertEqual(ExpectedClass, VariableClass(ActualVar), Concat("Var class ", Message));
+    {***** Test the correct attributes are set on the variable *****}
+    Framework\AssertEqual(ExpAttribs, VarAttributes(ActualVar), Concat("Var attribs ", Message));
+    {***** Test that the variable type matches *****}
+    Framework\AssertEqual(VariableType, GetVariableType(ActualVar), Concat("Var type ", Message));
+    {***** Test that the variable metadata matches *****}
+    Framework\AssertEqual(VarMetaData, GetVarMetaData(ActualVar), Concat("Var metadata ", Message));
+    {***** Test that the variable default value matches *****}
+    Framework\AssertEqual(DefaultValue, GetDefaultValue(ActualVar), Concat("Var default ", Message));
+    {***** Test that the source file matches the expected *****}
+    IfThen(Valid(ExpModuleName),
+      ExpFName = Concat(Drive, FullPath, ExpModuleName, ".SRC");
+      ModFName = ModuleFilename(TestMod);
+      ActualStream = FileStream(ModFName);
+      ExpectedStream = FileStream(ExpFName);
+      FrameWork\AssertEqual(ExpectedStream, ActualStream, Concat("Source compare ", Message));
+    );
+    Return(Invalid);
+  ]
+]
+
+{ End of _CreateVariables\CompareTestMod }
+>
+
+<
+{====================== _CreateVariables\RestoreTestMod ======================}
+{=============================================================================}
+RestoreTestMod
+(
+  TestMod;
+)
+[
+  ModFName;
+  BackupFName;
+]
+
+RestoreTestMod [
+  {***** Crude, but allow a little time for pending file I/O to complete *****}
+  If Timeout(1, 1) Recompile;
+  [
+    ModFName = ModuleFilename(TestMod);
+    BackupFName = Concat(ModFName, ".OLD");
+    FWrite(ModFName, 3, 0, "");
+    Rename(BackupFName, ModFName);
+  ]
+]
+
+Recompile [
+  If Valid(Framework\RebuildModule(TestMod, 1)) Done;
+  [
+    ResyncDoc(TestMod);
+  ]
+]
+
+Done [
+  Return(1);
+]
+
+{ End of _CreateVariables\RestoreTestMod }
+>
+
+{ End of _CreateVariables }

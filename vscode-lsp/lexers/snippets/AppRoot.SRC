@@ -1,0 +1,69 @@
+[
+  Constant POINTS              = 0x0002 { Tag template class                  };
+  Constant GROUPS              = 0xFF00 { Collections of tag types            };
+  Constant LIBRARIES           = 0xFF01 { Library class module                };
+  Constant GRAPHICS            = 0xFF02 { Shared drawing methods for tags     };
+  Constant PAGES               = 0xFF03 { Graphic pages & dialogs             };
+  Constant SERVICES            = 0xFF04 { Service class                       };
+  Constant PLUGINS             = 0xFF05 { Plug in modules                     };
+  Constant CONTRIBUTORS        = 0xFF05 { Class of modules that plug-in to us };
+  Constant PRIORITYSTART       = 0xFF06 { Items that are pre-started          };
+  Constant TSERVICES           = 0xFF07 { Threaded service class              };
+  Constant CHILDREN            = 0xFF08 { Child tags class                    };
+  Constant CONTAINERS          = 0xFF09 { Class of modules that we plug in to };
+  Constant NETWORKVALUE        = 0xFF0A { Class for NetworkValues module      };
+  Constant SESSIONSTART        = 0xFF0B { Modules started with each
+                                          DisplayManager session              };
+  Constant TEST                = 0xFF0C { Automated test                      };
+  Constant FIXTURE             = 0xFF0D { Test fixture for automated test     };
+  Constant DBTRACETRIGGER      = 0XFF0E { Triggers for SQL DB based traces    };
+  Constant API                 = 0xFF0F { API Variable Class                  };
+  Constant PAGEHOSTWIN         = 0XFF11 { Window hosting drawable page        };
+  Constant FILE_HANDLER        = 0xFF12 { File Handlers for loading apps      };
+  Constant SESSION_ID          = 0xFF13 { Session id variable class           };
+  Constant SHUTDOWN_HOOK       = 0xFF14 { Callback on application shutdown    };
+  Constant STRUCTURED_PARMS    = 0xFF15 { Structured parameter modules        };
+  Constant FUNCTIONS           = 0xFF16 { Function modules                    };
+
+  { Tag parameter metadata structure. }
+  TagField Struct [
+    Type;
+    Name;
+    Index;
+    Cypher;
+  ];
+
+  [ (POINTS)        {========= Modules that are point templates ===========}
+  ]
+
+  [ (GROUPS)        {==== Modules that are collections of point types =====}
+  ]
+
+  [ (LIBRARIES)     {======== Modules that contain library objects ========}
+  ]
+
+  [ (GRAPHICS)      {= Modules that are shared drawing methods for points =}
+  ]
+
+  [ (PAGES)         {===== Modules that are graphic pages and dialogs =====}
+    Overview Module "Pages\Overview.SRC";
+  ]
+
+  [ (SERVICES)      {===== Modules that are services that are started =====}
+  ]
+
+  [ (PLUGINS)       {===== Modules added to other base system modules =====}
+  ]
+
+  [(STRUCTURED_PARMS) {===== Used to pass multiple parms to widgets   =====}
+  ]
+
+  [ (PRIORITYSTART) {===== Modules/variables that are to be prestarted ====}
+  ]
+
+  [ (TSERVICES)     {====== Modules that are threaded services to run =====}
+  ]
+
+  [ (FUNCTIONS)     {====== Modules included in the function library ======}
+  ]
+]

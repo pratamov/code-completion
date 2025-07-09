@@ -1,0 +1,1370 @@
+{================================== Template ===============================}
+{ Revision 1.0.0 March 10, 1997. Glenn Wadden                               }
+{ Revision 1.0.1 March 21, 1997. Roland Bond, Fixed alarms                  }
+{ Revision 1.0.2 March 22, 1997. Glenn Wadden, Added PlaceObject Module.    }
+{ Revision 1.0.3 April 1,  1997. Glenn Wadden, Added more navigator doc.    }
+{ Revision 1.0.4 April 3,  1997. Glenn Wadden, Added DrawLabel to Draw      }
+{ Revision 2.0.0 April 12, 1997, Glenn Wadden, Support for standard types   }
+{ Revision 2.0.1 April 21, 1997, Glenn Wadden, Added DrawLabel to point     }
+{ Revision 2.1.0 April 28, 1997, Glenn Wadden, Groups and External Drawing  }
+{ Revision 2.1.1 April 29, 1997, Glenn Wadden, Questionable true by default }
+{ Revision 2.1.2 August 2, 2001, Debbie Brekelmans, Check-in to VSS, all    }
+{                                further versions assigned by VSS           }
+{                                                                           }
+{ This is a template for a point module.  This can form the basis for a     }
+{ generic point.  Every basic feature of a point is presented here.  You    }
+{ can use this as a template and remove the sections that are not required  }
+{ for your particular requirements.                                         }
+{                                                                           }
+{ The first three parameters are mandatory and the names of these parameters}
+{ must remain as shown.  Up to 100 additional parameters can be added.      }
+{ These parameters must match the order in the ODBC data table exactly.     }
+{ The parameter values passed to this module when it is launched are either }
+{ numeric or text - object values or other types are up to the module       }
+{ writer to interpret as necessary.                                         }
+{ The reference to this file is made in the APPMOD.SRC file and is included }
+{ this the PointClass section.                                              }
+{ This module will be added to the library at load time with its own        }
+{ unique class between 0x0002 and 0xFEFF.                                   }
+{===========================================================================}
+(
+  Name                       <:TagField("SQL_VARCHAR(64)",  "Name",                          0 ):> { Name of this instance of the point.  Its
+                                                                                                     value must be a legal WEB variable name &
+                                                                                                     is assumed to be no more than 256 characters
+                                                                                                     This parameter must exist and its name must
+                                                                                                     be "Name".  The value of this name string
+                                                                                                     cannot be the name of a reserved SQL keyword
+                                                                                                     or the name of a module in the library.     };
+  Area                       <:TagField("SQL_VARCHAR(255)", "Area",                          1 ):> { This is the name of the "area" to which
+                                                                                                     this instance belongs.  It may be up to 256
+                                                                                                     characters long and may be invalid or a null
+                                                                                                     string.  It is used by the browser to
+                                                                                                     filter the point list but may be used by
+                                                                                                     the point for any other purpose such as
+                                                                                                     the name of the graphics page which is
+                                                                                                     responsible for this point.  It must not
+                                                                                                     be the same name as a point or other
+                                                                                                     module in the library.  This parameter must
+                                                                                                     exist and must have the name "Area".        };
+  Description                <:TagField("SQL_VARCHAR(255)", "Description",                   2 ):> { This is the text description ofr this
+                                                                                                     instance of the point.  It may be any
+                                                                                                     character string up to 64k bytes long.  It
+                                                                                                     is treated as a single line of text. This
+                                                                                                     parameter must exist and must have the name
+                                                                                                     "Description".                              };
+  IODevice                   <:TagField("SQL_VARCHAR(255)", "I/O Device Name",               3 ):> { This is a sample parameter which references
+                                                                                                     another point instance in the database.  This
+                                                                                                     is always passed into the module as a text
+                                                                                                     string.  It is up to this module to assume
+                                                                                                     the type of this parameter and convert it as
+                                                                                                     required.                                   };
+  Address                    <:TagField("SQL_VARCHAR(255)", "Input Address",                 4 ):> { This is a sample parameter which is a string};
+  ScanInterval               <:TagField("SQL_VARCHAR(255)", "Scan Interval (Seconds)",       5 ):> { This is a sample parameter which is a
+                                                                                                     numeric value.  The ODBC driver may pass this
+                                                                                                     value as a text string.                     };
+  ManualValue                <:TagField("SQL_VARCHAR(255)", "Manual Data Value",             6 ):> { This is a numeric value which, if a valid
+                                                                                                     number, will set the Value for the point.   };
+  Owner                      <:TagField("SQL_VARCHAR(255)", "Owning Point Name",             7 ):> { Contains a text string which is the name of
+                                                                                                     the point which is the container for the
+                                                                                                     standard point.  This code assumes that this
+                                                                                                     point behaves like a standard point in its
+                                                                                                     contributor/container characteristics.  This
+                                                                                                     text string must be converted to a object
+                                                                                                     value to use it.                            };
+  ContributionType           <:TagField("SQL_VARCHAR(255)", "Type of Contribution to Owner", 8 ):> { This is the bit field which determines the
+                                                                                                     data which gets contributed to the Owner.
+                                                                                                     The meaning of the bits are:
+                                                                                                       0 - Set Value in Owner\Data[0]
+                                                                                                       1 - Set Value in Owner\Data[1]
+                                                                                                       2 - Set Value in Owner\Data[2]
+                                                                                                       3 - Set Value in Owner\Data[3]
+                                                                                                       4 - Sets the AlarmActive array element to
+                                                                                                           the current active alarm priority or
+                                                                                                           Invalid if not in alarm.  Sets the
+                                                                                                           UnacknowledgedAlarm array element to the
+                                                                                                           current unacknowledged alarm priority or
+                                                                                                           Invalid if not unacknowledged.
+                                                                                                       5 - Increments the InManual variable when
+                                                                                                           the point has a manual data value and
+                                                                                                           decrements it when it doesn't have a
+                                                                                                           manual data value.
+                                                                                                       6 - Sets the value in the GoodQuality
+                                                                                                           array to 1 when the point has a good
+                                                                                                           data quality and sets it to 0 when it
+                                                                                                           when it has bad data quality.
+                                                                                                       7 - Increments the QuestionableCount variable
+                                                                                                           when the point is questionable and
+                                                                                                           decrements it when it isn't questionable};
+  Questionable               <:TagField("SQL_VARCHAR(255)", "Questionable Data Flag",        9 ):> { Set to true when the operator deems that the
+                                                                                                     data is invalid.  This will be set to true
+                                                                                                     by default when the point is first created.
+                                                                                                     This serves as a "not-commissioned" flag.   };
+  Quality                    <:TagField("SQL_VARCHAR(255)", "Data Quality Point",            10):> { This is the text string which is the name of
+                                                                                                     the point which detmines if this point has
+                                                                                                     good data.  This text string must be
+                                                                                                     converted to an object value of the point.
+                                                                                                     If this value is 1 or invalid, this point's
+                                                                                                     Value is considered to contain good data.   };
+  Container                  <:TagField("SQL_VARCHAR(255)", "Container Point Name",          11):> { Contains a text string which is the name
+                                                                                                     of the point to which this point contributes.
+                                                                                                     This text string must be converted to the
+                                                                                                     object value of the point.                  };
+  Priority                   <:TagField("SQL_VARCHAR(255)", "Alarm Priority",                12):> { Alarm priority.  This is a numeric value.
+                                                                                                     0 indicates that there is no alarm action
+                                                                                                     required.                                   };
+  AlarmInhibit               <:TagField("SQL_LONGVARCHAR",  "Alarm Inhibit",                 13):> { Status value which, when true, prevents
+                                                                                                     alarm events from occuring.                 };
+  LogRate                    <:TagField("SQL_VARCHAR(50)",  "LogRate",                       14):> { Data logging interval in seconds.  0 indicates
+                                                                                                     that no data logging should occur.  If this
+                                                                                                     value is < 0, log the data on change only.  };
+  HelpKey                    <:TagField("SQL_VARCHAR(255)", "Help System Index",             15):> { This is a text string which is used as a
+                                                                                                     search key in the help system.  The
+                                                                                                     HelpEXE variable defined in the [System]
+                                                                                                     section of the Settings.Dynamic file determines
+                                                                                                     the command line to use to launch the help
+                                                                                                     program.  The HelpKey is passed as a
+                                                                                                     command line parameter to the HelpEXE. If
+                                                                                                     this HelpEXE variable is not defined,
+                                                                                                     the Windows help system is used.            };
+)
+
+[
+   { The next block of constant definitions defines the offset into the
+     parameter list, starting from 0, for each of the point specific
+     parameters.  These constant definitions allow easier modification
+     of this code for inserting and deleting parameters while minimizing
+     the changes to the Refresh and ConfigFolder modules.  These constant
+     definitions do not increase the RAM requirements for each instance
+     of the point.                                                          }
+  Constant #IODevice         = 3;
+  Constant #Address          = 4;
+  Constant #ScanInterval     = 5;
+  Constant #ManualValue      = 6;
+  Constant #Owner            = 7;
+  Constant #ContributionType = 8;
+  Constant #Questionable     = 9;
+  Constant #Quality          = 10;
+  Constant #Container        = 11;
+  Constant #Priority         = 12;
+  Constant #AlarmInhibit     = 13;
+  Constant #LogRate          = 14;
+
+  {*************************************************************************}
+  { The DrawLabel variable specifies the name of the variable defined in    }
+  { the Settings.Dynamic file which will be used to label the previews of   }
+  { this point during configuration.  This is done so that text can easily  }
+  { be translated.                                                          }
+  {*************************************************************************}
+  Constant DrawLabel = "TemplatePointLabel";
+
+  Root                        { This variable must be defined and must contain
+                                the instance of this module as its value.  This
+                                is required to allow the parameter editing
+                                tools to access the parameters of this
+                                point                                       };
+
+  Refresh Module              { Subroutine which will be called by the
+                                point parameter configuration tools to
+                                notify this point when on-line changes to the
+                                parameters are made.                        };
+
+   { The following variables may or may not be required for a specific point }
+  RawValue                    { Data value read from the IO                 };
+
+  {*************************************************************************}
+  {                      D A T A    L O G G I N G                           }
+  {                                                                         }
+  { A maximum of 100 variables can be logged and all variables get logged   }
+  { in the same file for this point.                                        }
+  {                                                                         }
+  { Any variable which is to be data logged should have a variable class of }
+  { 1 to 5.  The class specifies the data type to log:                      }
+  {     Class 1 - Bit                                                       }
+  {     Class 2 - Unsigned byte                                             }
+  {     Class 3 - 16 Bit signed integer                                     }
+  {     Class 4 - 32 Bit signed integer                                     }
+  {     Class 5 - Single precision floating point                           }
+  { If there are no variables defined in this class range, the Value        }
+  { variable will be used and treated as if it were a single precision      }
+  { floating point value.                                                   }
+  {                                                                         }
+  { The variables are recorded in the .DAT file in increasing order of      }
+  { variable class and alphabetically within the class.                     }
+  { You must not add or delete these variables unless the file is deleted or}
+  { else the trend manager will misninterpret the file contents for previous}
+  { data.                                                                   }
+  {*************************************************************************}
+
+  Value (5)                   { Scaled value. Value must be defined if this
+                                point is to operate with the standard alarm
+                                and function points.
+                                Setting its class to 5 tells the data logger
+                                and trend manager that this variable is to
+                                be logged as a floating point value,  This
+                                is the default if there are no class 1 to 5
+                                variables defined.                          };
+  LogFileName Module          { This is an optional module which will be
+                                launched by the standard data logger module
+                                to set the name of the file to log to.
+                                If this module doesn't exist, the
+                                LogFileName module in the system will be
+                                launched to get this name.  This module can
+                                be overridden in the application's APPMOD.SRC
+                                file to provide a new common method for
+                                naming log files.  This could use such
+                                techniques as changing the name every day,
+                                week or batch.  The launched module can be
+                                a subroutine which simply sets the name
+                                once, or it can remain running to change
+                                the name dynamically based upon time or
+                                operating conditions.  The subroutine will
+                                use far less memory but provide less
+                                flexibility.  The standard data logger will
+                                remember the names of the files and work
+                                with the trend manager to allow users to
+                                access this data across several files.      };
+
+  ExternalValue = 0           { This variable is a convention used to indicate
+                                if there some other code that is responsible
+                                for setting the value.  This can be used in
+                                a Script to prevent the RawValue from
+                                updating the Value directly and allow the
+                                script to set the value instead.            };
+  LogObject                   { This variable contains the object value of
+                                the launched data logging module.  One such
+                                variable should exist for each logged value.};
+
+  Alarms Module               { Launched module to handle alarming.  This code
+                                could exist in the base module if there is
+                                only one alarm.                             };
+  AlarmObject                 { This variable contains the instance of the
+                                alarm handling code.                        };
+
+  {****************************************************************************}
+  { The PLUGINS section lists modules which are defined outside of this module }
+  { and are attached dynamically to this point.  This is done so that the user }
+  { can override these modules and insert their own versions without having to }
+  { modify this code.                                                          }
+  { The variables defined in this section will be assigned module values at    }
+  { load time and will be treated like modules.  The name of the variable here }
+  { specifies the name of the module.  If a default value is set for these     }
+  { variables, the default value is the name of the module in the \CODE scope. }
+  { If the default value is not defined, the name of the shared variable here  }
+  { is used as the name searched for in the \CODE scope.                       }
+  {****************************************************************************}
+  [ (PLUGINS)
+    {**************************************************************************}
+    { Module which handles the modification of the point's parameters on-line. }
+    { The TemplateConfig module is defined in the APPMOD.SRC file in the       }
+    { PLUGINS section.  It has a corresponding file of TempCnf.SRC where the   }
+    { actual ConfigFolder code exists.                                         }
+    {**************************************************************************}
+    Shared ConfigFolder = "TemplateConfig";
+
+    {**************************************************************************}
+    { This module is called by the external drawing modules to handle common   }
+    { point specific actions associated with the drawing object.  This         }
+    { includes such things as the Navigator, PostIt and PkTrend calls.         }
+    { The TemplateCommon module is defined in the APPMOD.SRC file in the       }
+    { PLUGINS section.  It has a corresponding file of TempCmn.SRC where the   }
+    { actual Common code exists.                                               }
+    {**************************************************************************}
+    Shared Common       = "TemplateCommon";
+  ]
+
+  [ (GRAPHICS)
+    Draw         Module       { This module draws a representation of the
+                                point on the screen.  All such modules must
+                                have a class of GRAPHICS.  0 or more such
+                                modules can exist.  The modules are displayed
+                                in the preview selection dialog in the order
+                                in which they are declared here.  The name
+                                of the module is displayed in the preview
+                                selection dialog as well.                   };
+    Shared BarGraph           { This variable will act as if it were a
+                                drawing module link "Draw" above except that
+                                it is defined in the Appmod.SRC module
+                                rather than here.  This allows the module
+                                to be shared by different points.  This is
+                                the prefered way of defining a graphic
+                                drawing module for a point since it can
+                                be replaced by the user and shared by other
+                                points without rewriting the point module
+                                code.  The BarGraph module itself has all
+                                of the same characteristics and rules of
+                                the Draw module declared within this code,
+                                with the additional requirement that any
+                                variables from the point which are referenced
+                                in BarGraph MUST be preceeded with a \.     };
+  ]
+
+
+   {===== Generic container point types need the following block.  The
+          Contributors variable is not used for the standard I/O point
+          types.                                                       =====}
+  Contributors                { This variable contains a "handle" to the list
+                                of contributing points to this point.  A
+                                contributing point is one that refers to this
+                                point and registers with this point.  The
+                                name of this variable is irrelevant and there
+                                may be 0 or more such contributing
+                                relationships.  The type of this parameter
+                                is not defined here since it is manipulated
+                                by library tools which may change over time.
+                                There may be multiple "contributors" lists for
+                                any application.                            };
+
+  ContributorAdded   Module   { This is an optional subroutine which will be
+                                called whenever a new contributing point is
+                                added to us. The name of this module is fixed
+                                and cannot be changed.  Only one of these
+                                modules exist for all "contributors"-type
+                                variables.                                  };
+  ContributorDeleted Module   { This is an optional subroutine which will be
+                                called whenever a new contributing point is
+                                deleted from us. The name of this module is
+                                fixed and cannot be changed.  Only one of these
+                                modules exist for all "contributors"-type
+                                variables.                                  };
+
+  [ (GROUPS)
+    Shared GrpContainer       { Container parm should be deleted if this module is
+                                itself a container, being replaced by this group };
+  ]
+   {===== End of container point type block =====}
+
+   {===== Contributor point types need the following block =====}
+  ContainerIndex              { Unique integer which identifies where in the
+                                container list this point exists.  This value
+                                is updated by the VTS code which maintains the
+                                container list.  You must be prepared to have
+                                this value change at any time.  This value can
+                                be used to index into a known array in the
+                                container to update a value.  There should
+                                be a unique variable for each contributor
+                                parameter which uses this feature.          };
+
+   { The following variables are similar in nature to the ContainerIndex.
+     They hold the array indicies for the contributions to the Owner
+     object and are typical of such varaibles found in standard I/O points. }
+  Data0Index                  { Index in the Owner\Data[0] array            };
+  Data1Index                  { Index in the Owner\Data[1] array            };
+  Data2Index                  { Index in the Owner\Data[2] array            };
+  Data3Index                  { Index in the Owner\Data[3] array            };
+  AlarmIndex                  { Index in the Owner\AlarmActive array        };
+  QualityIndex                { Index in the Owner\GoodQuality array        };
+   {===== End of contributor point type block =====}
+
+  {**************************************************************************}
+  { The following section would be necessary if this point is a container    }
+  { for the basic point types: DI, DO, AI and AO.                            }
+  { This would usually not coexist with the previous block of contributor    }
+  { variable declartions.                                                    }
+  { The ContributorAdded and ContributorDeleted subroutines are required     }
+  { for use with these variables.                                            }
+  {**************************************************************************}
+  Data0                       { This array holds the Values of the contributing
+                                points.  Each of the four Data? variables
+                                holds an array of values. A contributor may
+                                sets it value in any combination of the four
+                                arrays.                                     };
+  Data1                       { This array holds the Values of the contributing
+                                points.  Each of the four Data? variables
+                                holds an array of values. A contributor may
+                                sets it value in any combination of the four
+                                arrays.                                     };
+  Data2                       { This array holds the Values of the contributing
+                                points.  Each of the four Data? variables
+                                holds an array of values. A contributor may
+                                sets it value in any combination of the four
+                                arrays.                                     };
+  Data3                       { This array holds the Values of the contributing
+                                points.  Each of the four Data? variables
+                                holds an array of values. A contributor may
+                                sets it value in any combination of the four
+                                arrays.                                     };
+  Data0Contributors           { This is the "handle" used by the VTS code
+                                to maintain a list of the contributors to
+                                the value array for Data[0]                 };
+  Data1Contributors           { This is the "handle" used by the VTS code
+                                to maintain a list of the contributors to
+                                the value array for Data[1]                 };
+  Data2Contributors           { This is the "handle" used by the VTS code
+                                to maintain a list of the contributors to
+                                the value array for Data[2]                 };
+  Data3Contributors           { This is the "handle" used by the VTS code
+                                to maintain a list of the contributors to
+                                the value array for Data[3]                 };
+  AlarmActive                 { This is an array of alarm priorities for all
+                                active alarm contributors.  Any alarm
+                                contributors which are not active will set
+                                their element to invalid.                   };
+  UnacknowledgedAlarm         { This is an array of alarm priorities for all
+                                unacknowledged alarm contributors.  Any
+                                acknowledged alarm will set its element to
+                                invalid.  This array is a 1 to 1
+                                correspondence to the AlarmActive array.    };
+  AlarmContributors           { This is the "handle" used by the VTS code
+                                to maintain a list of the alarm contributors};
+  InManual                    { This is a count of the number of manual
+                                status contributors which are current in
+                                manual mode.                                };
+  ManualContributors          { This is the "handle" used by the VTS code
+                                to maintain a list of the manual
+                                contributors.                               };
+  GoodQuality                 { This is an array of Boolean values for
+                                which the 1's indicate that the contributor
+                                has good data quality.                      };
+  QualityContributors         { This is the "handle" used by the VTS code
+                                to maintain a list of the data quality
+                                contributors.                               };
+  QuestionableCount           { This is a counter of the number of
+                                questionable data contributors which
+                                currently have the questionable flag set    };
+  QuestionableContributors    { This is the "handle" used by the VTS code
+                                to maintain a list of the data quality
+                                contributors.                               };
+   {===== End of standard container variables =====}
+
+   {===== Point specific variables =====}
+  Average                     { Example of locally calculated data value.
+                                This example calculates the average of all of
+                                the contributor's values.                   };
+  AndData                     { The result of ANDing of all of the contributor's
+                                values which are valid.                     };
+  Values                      { This variable represents an array which would
+                                hold the real-time values of the contributors.
+                                The contributors update their values in this
+                                array.  The array is dynamically allocated by
+                                ContributorAdded and ContributorDeleted.  This
+                                is application specific code and any number of
+                                such arrays may exist to support the
+                                requirments                                 };
+  Shared TempData             { Temporary array used to calculate the ANDed
+                                values of Data.  This value can be "shared"
+                                since it is used entirely as a temporary
+                                variable within a script.  This will save
+                                memory for each instance of the point.      };
+  {*************************************************************************}
+  { Custom object placement code                                            }
+  {*************************************************************************}
+  { This code is commented out because we don't want to use this feature here }
+  PlaceObject Module          { The presence of this module declaration
+                                informs the system that this module will
+                                handle placement of the drawing object
+                                on the screen.  Only graphics module which
+                                have a variable defined called "PlaceObject"
+                                (besides this one) will use this module.
+                                If this module does not exist, a preview of
+                                the object will follow the mouse and the object
+                                will be placed on the screen at the location
+                                where the left mouse button is pressed or where
+                                the ENTER key is pressed.  This module takes
+                                six parameters.  The first parameter is a
+                                pointer to the state value where the code
+                                is to be added.  This must be set by the
+                                PlaceObject module.  The next four define
+                                are pointers to variables which will be
+                                set to the area on the window where the
+                                object is to be placed (set by this
+                                module also).  The last parameter is
+                                a pointer to a variable which this module
+                                will set to the text string which will
+                                be added to the code as parameters to
+                                the drawing module.  The text string
+                                is placed literally between the ( )
+                                and must be a compilable parameter list.
+                                Defining this module implies that you
+                                must do the work of finding the correct
+                                module and state to draw within, show
+                                the appropriate drawing previews on the
+                                screen while the object is being placed
+                                and create the parameter list string.
+                                This makes the Configure module code
+                                redundant.                                  };
+  
+]
+
+TemplateInit [
+  If 1 Template;
+  [
+    Root = Self               { This value must be set to self() for all
+                                points.  It is used by the parameter editing
+                                code.                                       };
+
+     { Set up initial values }
+    Refresh();
+  ]
+]
+
+  { Name of the state is something fairly unique so that when it shows
+    up in the profiler the user can see something other than System, Main }
+Template [
+
+  {*************************************************************************}
+  { Setting data value                                                      }
+  {*************************************************************************}
+
+   { Don't want to set Value in a statement so that the scripts can set
+     it if the ExternalValue is true.                                       }
+  If Watch(1, RawValue, ExternalValue);
+  [
+    IfThen (!ExternalValue || Valid(ManualValue),
+      Value = PickValid(ManualValue, RawValue);
+    );
+  ]
+
+  If Watch(1, Value);
+  [
+      { This block of code handles the contributors to the owner }
+      { Test is there is any contributions at all before we spend the time
+        to test each of the bits.                                           }
+    IfThen (And(ContributionType, 0x0F),
+      IfThen (Bit(ContributionType, 0),
+        Owner\Data0[Data0Index] = Value;
+      );
+      IfThen (Bit(ContributionType, 1),
+        Owner\Data1[Data1Index] = Value;
+      );
+      IfThen (Bit(ContributionType, 2),
+        Owner\Data2[Data2Index] = Value;
+      );
+      IfThen (Bit(ContributionType, 3),
+        Owner\Data3[Data3Index] = Value;
+      );
+    );
+  ]
+
+  {*************************************************************************}
+  { Contribute data to our container                                        }
+  {*************************************************************************}
+
+   { This is sample code which will maintain an array in the container so
+     that the container can take the average of the data.  This code assumes
+     variable names so requires a knowledge of the variables in the
+     container.  The names may have to be changed to suit the situation.    }
+   { As a contributor, I will set my value in the container as an example }
+  Container\Values[ContainerIndex] = Value;
+
+   { We must watch for a change in the quality data to update the
+     counter in our container.                                              }
+  Owner\GoodQuality[QualityIndex] = PickValid(Quality\Value != 0, 1);
+
+  {*************************************************************************}
+  { Container calculations using contributor's data                         }
+  {*************************************************************************}
+
+   { As a container, I will take the average of all my contributor values.
+     This code assumes that the contributors have set their values in my
+     Values array.                                                          }
+  Average = Mean(Values[0], ArraySize(Values, 0));
+
+   { As a container, I will take the AND of all my contributor values.
+     This code assumes that the contributors have set their values in my
+     Values array.  It is very unlikely that both the Mean and AND operations
+     would be done on the same data in a real point.                        }
+  If WatchArray(1, Values[0], ArraySize(Values, 0));
+  [
+     { First make a copy of the data }
+    TempData = New(ArraySize(Values, 0));
+    ArrayOp2(TempData[0], Values[0], ArraySize(Values, 0), 0);
+
+     { Convert all zero values to 1 and all non-zero values to 0 -
+       there is a constraint on the available op codes in ArrayOp1 so
+       we reversed the logic.  I wouldn't have to do this if the contributors
+       set only 0's or 1's in the data array.                               }
+    ArrayOp1(TempData[0], ArraySize(TempData, 0), 0, 12 { A == S });
+
+     { All of the contributors are true if the sum of the data equals the
+       number of valid entries in the array.                                }
+    AndData = Sum(TempData[0], ArraySize(TempData, 0)) ==
+              AValid(TempData[0], ArraySize(TempData, 0));
+
+     { Set the TempData to invalid to free up the memory used by the array }
+    TempData = Invalid;
+  ]
+]
+
+<
+{============================== Refresh ====================================}
+{ This subroutine will be called whenever the parameters for the module     }
+{ are changed and allow the point to perform any necessary actions to       }
+{ undo any previous effects necessary such as changing drivers.  It is      }
+{ passed an array of the previous parameter values.  The current parameter  }
+{ values for the point have already been changed by the time this is called.}
+{ This is called prior to writting data to the ODBC database.               }
+{ This subroutine provides a way to reduce the memory requirements of the   }
+{ point by reducing the number of variables and code required in the main   }
+{ point module.                                                             }
+{===========================================================================}
+Refresh
+(
+  Parm                        { This is a pointer to an array which contains
+                                the values of all of the parameters for the
+                                point prior to their change.                }
+)
+
+Refresh [
+  If 1;
+  [
+    {***********************************************************************}
+    { IODevice                                                              }
+    {***********************************************************************}
+
+     { Convert the text string for IODevice point value to an object value.  If
+       it already has an object value, leave it alone.                      }
+    IfThen (ValueType(Parm[#IODevice]) == 4 { Text },
+      Parm[#IODevice] = Scope(\Code, Parm[#IODevice])
+    );
+
+     { If this is called from the initialization of the point, the
+        Parm is invalid and the IODevice value is text.                         }
+    IfThen (ValueType(IODevice) == 4 { Text },
+      IODevice = Scope(\Code, IODevice)
+    );
+
+    IfThen (!Valid(ScanInterval),
+      ScanInterval = 0;
+    );
+
+    IfThen (PickValid(Parm[#IODevice]     != IODevice,     1) ||
+            PickValid(Parm[#ScanInterval] != ScanInterval, 1) ||
+            PickValid(Parm[#Address], "") != PickValid(Address, ""),
+       { Someone changed the IODevice ! }
+       { Remove the previous read request. This will do nothing if the
+         parameters are invalid }
+      Parm[#IODevice]\Driver\DelRead(Parm[#Address], &RawValue, Parm[#ScanInterval]);
+
+        { Set up new read request to read 1 value from the IODevice and place
+          the result into RawValue every ScanInterval seconds }
+      IODevice\Driver\AddRead(Address      { Address in the IODevice for the data        },
+                              1            { Number of data elements to get         },
+                              &RawValue    { Destination pointer for data read      },
+                              ScanInterval { Scan Interval                          });
+    );
+
+
+    {***********************************************************************}
+    { ManualValue                                                            }
+    {***********************************************************************}
+    ManualValue = Cast(ManualValue, 3 { Floating Point });
+    IfElse (Valid(ManualValue),
+      Value = ManualValue;
+    { Else } IfThen (!ExternalValue,
+      Value = RawValue;
+    ));
+
+    {***********************************************************************}
+    { Quality                                                               }
+    {***********************************************************************}
+    IfThen (ValueType(Quality) == 4 { Text },
+      Quality = Scope(\Code, Quality);
+    );
+
+    {***********************************************************************}
+    { Questionable                                                          }
+    {***********************************************************************}
+    Questionable = PickValid(Cast(Questionable, 3 { Floating point }) != 0, 1);
+
+    {***********************************************************************}
+    { Owner                                                                 }
+    {***********************************************************************}
+    IfThen (ValueType(Parm[#Owner]) == 4 { Text },
+      Parm[#Owner] = Scope(\Code, Parm[#Owner])
+    );
+
+    IfThen (ValueType(Owner) == 4 { Text },
+      Owner = Scope(\Code, Owner)
+    );
+
+    IfElse(PickValid(Owner != Parm[#Owner], 1) || ContributionType != Parm[#ContributionType], Execute(
+       { The owner has changed }
+      IfThen (Bit(Parm[#ContributionType], 0),
+        \DeleteContributor("Data0Contributors", "Data0", Invalid, Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 1),
+        \DeleteContributor("Data1Contributors", "Data1", Invalid, Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 2),
+        \DeleteContributor("Data2Contributors", "Data2", Invalid, Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 3),
+        \DeleteContributor("Data3Contributors", "Data3", Invalid, Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 4),
+        \DeleteContributor("AlarmContributors", "AlarmActive", Invalid, Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 5),
+        \DeleteContributor("ManualContributors", Invalid, "InManual", Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 6),
+        \DeleteContributor("QualityContributors", "GoodQuality", Invalid, Parm[#Owner], Root, Invalid);
+      );
+      IfThen (Bit(Parm[#ContributionType], 7),
+        \DeleteContributor("QuestionableContributors", Invalid, "QuestionableCount", Parm[#Owner], Root, Invalid);
+      );
+
+      IfElse (Bit(ContributionType, 0),
+        \AddContributor("Data0Contributors", "Data0", Invalid, Owner, Root, &Data0Index, Value, Invalid);
+      { Else }
+        Data0Index = Invalid;
+      );
+      IfElse (Bit(ContributionType, 1),
+        \AddContributor("Data1Contributors", "Data1", Invalid, Owner, Root, &Data1Index, Value, Invalid);
+      { Else }
+        Data1Index = Invalid;
+      );
+      IfElse (Bit(ContributionType, 2),
+        \AddContributor("Data2Contributors", "Data2", Invalid, Owner, Root, &Data2Index, Value, Invalid);
+      { Else }
+        Data2Index = Invalid;
+      );
+      IfElse (Bit(ContributionType, 3),
+        \AddContributor("Data3Contributors", "Data3", Invalid, Owner, Root, &Data3Index, Value, Invalid);
+      { Else }
+        Data3Index = Invalid;
+      );
+      IfElse (Bit(ContributionType, 4),
+        \AddContributor("AlarmContributors", "AlarmActive", Invalid, Owner, Root,
+                        &AlarmIndex, Invalid { Current state is set by Alarms module }, Invalid);
+      { Else }
+        AlarmIndex = Invalid;
+      );
+      IfThen (Bit(ContributionType, 5),
+        \AddContributor("ManualContributors", Invalid, "InManual", Owner, Root, Invalid, Invalid,
+                        Valid(ManualValue));
+      );
+      IfElse (Bit(ContributionType, 6),
+        \AddContributor("QualityContributors", "GoodQuality", Invalid, Owner, Root,
+                        &QualityIndex, PickValid(Quality\Value == 0, 0) { Set in main state of the point },
+                        Invalid);
+      { Else }
+        QualityIndex = Invalid;
+      );
+      IfThen (Bit(ContributionType, 7),
+        \AddContributor("QuestionableContributors", Invalid, "QuestionableCount", Owner, Root, Invalid, Invalid,
+                        Questionable);
+      );
+    );
+    { Else } Execute(
+      IfThen(Bit(ContributionType, 5) && Valid(ManualValue) != Valid(Parm[#ManualValue]),
+        \DeleteContributor("ManualContributors", Invalid, "InManual", Parm[#Owner], Root,
+                           Valid(Parm[#ManualValue]));
+        \AddContributor("ManualContributors", Invalid, "InManual", Owner, Root, Invalid, Invalid,
+                        Valid(ManualValue));
+      );
+      IfThen(Bit(ContributionType, 7) &&
+             (Questionable != Parm[#Questionable] || Valid(Questionable) != Valid(Parm[#Questionable])),
+        \DeleteContributor("QuestionableContributors", Invalid, "QuestionableCount", Parm[#Owner],
+                           Root, Parm[#Questionable]);
+        \AddContributor("QuestionableContributors", Invalid, "QuestionableCount", Owner,
+                        Root, Invalid, Invalid, Questionable);
+      );
+    ));
+
+    {***********************************************************************}
+    { Container                                                             }
+    {***********************************************************************}
+
+     { The container parameter may be a text string which must be converted
+       to a object value pointing to the container object/point.
+       First convert the old parameter value to an object value and then the
+       current one.                                                         }
+    IfThen (ValueType(Parm[#Container]) == 4 { Text },
+      Parm[#Container] = Scope(\Code, Parm[#Container])
+    );
+
+    IfThen (ValueType(Container) == 4 { Text },
+      Container = Scope(\Code, Container)
+    );
+
+     { We must check if there is a change in the "container" parameter.
+       This is very similar to the IODevice code since the IODevice code is also
+       a container style relationship.
+       This code does not affect OUR "contributors" variable value but does
+       affect the "contributors" variable values of the modules pointed to
+       by the Parm[#Container] and Container values.                      }
+    IfThen (PickValid(Parm[#Container] != Container, 1),
+       { Unhook this object from the old container point and then hook it
+         on to the new container point.                                   }
+
+       { If the old parameter is invalid, this has no effect. }
+      \DeleteContributor("Contributors" { Name of the variable in the container
+                                          which will be updated },
+                          Parm[#Container], Root);
+
+       { If the new parameter is invalid, this has no effect. }
+      \AddContributor("Contributors" { Name of the variable in the container
+                                       which will be updated },
+                      Container, Root,
+                      &ContainerIndex { Pointer to a variable which will be
+                                        set to the offset in the list in the
+                                        container.  This value will be updated
+                                        as other points are added or deleted
+                                        from the container. });
+    );
+
+    {***********************************************************************}
+    { Data logging                                                          }
+    {***********************************************************************}
+
+     { Launch the data logger if one is required and kill the old one if no
+       longer required.                                                     }
+    IfThen (PickValid(Parm[#LogRate] != LogRate, 1),
+      Slay(LogObject, 0);
+      IfThen (LogRate > 0,
+        LogObject = \Logger(Root,
+                            LogRate,
+                            Invalid,
+                            100000   { Number of records in the file },
+                            Int(60 / LogRate) { RAM buffer size.  Here we'll
+                                                buffer data in RAM for up to
+                                                60 seconds before writting to
+                                                disk to improve overall system
+                                                performance.              });
+      );
+    );
+
+    {***********************************************************************}
+    { Alarming                                                              }
+    {***********************************************************************}
+
+     { Start up the alarms if they are not currently running and the
+       priority is non-zero                                                 }
+    IfThen (!Valid(AlarmObject) && Priority > 0 &&
+            ValueType(\AlarmManager) == 7 { Object value },
+      AlarmObject = Alarms();
+    );
+
+    Return(0);
+  ]
+]
+
+{ End of Refresh }
+>
+
+<
+{============================== ContributorAdded ===========================}
+{ This subroutine is called whenever a contributor is added to this point.  }
+{ This code DOES NOT maintain the list.                                     }
+{ This subroutine need not exist if there are no special actions to take or }
+{ if this point is not a container.                                         }
+{ This code is called by the base VTS system.                               }
+{===========================================================================}
+ContributorAdded
+(
+  VariableName                { Name of the handle which was updated - this
+                                would typically be "Contributors".          };
+  ArrayName                   { Name of variable in this point which holds
+                                an array of values which was updated        };
+  CountName                   { Name of the variable in this point which
+                                holds a count of the current number of this
+                                type of contributor.                        };
+  NewPoint                    { Object value of the new point added         };
+  N                           { Total number of contributors now in the list};
+  Index                       { Index of the added item                     };
+)
+
+[
+  NewArray                    { Temporary array for the unacknowledged list };
+]
+
+ContributorAdded [
+  If 1;
+  [
+     { Most of the contributor handling is done by the base system code.
+       Here we handle the one specail case in this example where the
+       alarm contributor to us needs to maintain two arrays:
+       AlarmActive and UnacknowledgedAlarm.  We leave it to the contributor
+       and the base code to handle AlarmActive and here we need to
+       allocate the array for UnacknowledgedAlarm.                          }
+
+    IfThen (StriCmp(VariableName, "AlarmContributors"),
+       { Test the VariableName to prevent performing these actions when
+         another contributor variable is being added.                       }
+      NewArray = New(N);
+      ArrayOp2(NewArray[0], UnacknowledgedAlarm[0], Index, 0);
+      ArrayOp2(NewArray[Index + 1], UnacknowledgedAlarm[Index], N - Index - 1, 0);
+      UnacknowledgedAlarm = NewArray;
+
+       { It is now up the the contributor to set the current value of the
+         UnacknowledgedAlarm[Index] when the its call to AddContributor
+         is complete.                                                       }
+    );
+    Return(0);
+  ]
+]
+
+{ End of ContributorAdded }
+>
+
+<
+{============================== ContributorDeleted =========================}
+{ This subroutine is called whenever a contributor is deleted from this     }
+{ point.                                                                    }
+{ This code DOES NOT maintain the list.                                     }
+{ This subroutine need not exist if there are no special actions to take or }
+{ if this point is not a container.                                         }
+{ This code is called by the base VTS system.                               }
+{===========================================================================}
+ContributorDeleted
+(
+  VariableName                { Name of the variable which was updated - this
+                                would typically be "Contributors".          };
+  ArrayName                   { Name of variable in this point which holds
+                                an array of values which was updated        };
+  CountName                   { Name of the variable in this point which
+                                holds a count of the current number of this
+                                type of contributor.                        };
+  OldPoint                    { Object value of the old point deleted       };
+  N                           { Total number of contributors now in the list};
+  Index                       { Index of the deleted item                   };
+)
+
+[
+  NewArray                    { Temporary array for the unacknowledged list };
+]
+
+ContributorDeleted [
+  If 1;
+  [
+     { Most of the contributor handling is done by the base system code.
+       Here we handle the one specail case in this example where the
+       alarm contributor to us needs to maintain two arrays:
+       AlarmActive and UnacknowledgedAlarm.  We leave it to the contributor
+       and the base code to handle AlarmActive and here we need to
+       allocate the array for UnacknowledgedAlarm.                          }
+
+    IfThen (StriCmp(VariableName, "AlarmContributors"),
+       { Test the VariableName to prevent performing these actions when
+         another contributor variable is being added.                       }
+      NewArray = New(N);
+      ArrayOp2(NewArray[0], UnacknowledgedAlarm[0], Index, 0);
+      ArrayOp2(NewArray[Index], UnacknowledgedAlarm[Index + 1], N - Index, 0);
+      UnacknowledgedAlarm = NewArray;
+    );
+    Return(0);
+  ]
+]
+
+{ End of ContributorDeleted }
+>
+
+<
+{============================== Alarms =====================================}
+{ This module is launched if there are any alarms to handle.  This module   }
+{ allows handling of multiple alarms easily.  For a single alarm, this      }
+{ module may be too expensive memory-wise and the code could be placed in   }
+{ the base point state.                                                     }
+{===========================================================================}
+Alarms
+
+[
+  { We need to make sure that all of the field names in the alarm database
+    have corresponding variables defined within the scope of the alarm
+    module or no alarms will occur.                                         }
+  Name                        { Unique name to register the alarm as        };
+  Operator = "";
+  Type     = 1000;
+  Message                     { Alarm message to log or display             };
+
+  LastValue                   { Last checked value for the alarm            };
+  AlarmFlag                   { True when an alarm exists                   };
+]
+
+AlarmsInit [
+   { This test looks stupid, but the two cases are that we have to wait
+     until the alarm manager has started or that someone has turned off
+     the alarm manager in the Settings.Dynamic file using AlarmManager = 0   }
+  If \AlarmManager\Started AlarmsMain;
+  [
+     { This subroutine registers the alarm in the database using the
+       point's UniqueID variable as the name of the alarm.  If there are
+       multiple alarms to register, then assign the local Name variable
+       to a unique value before each call to Register().
+       The Register places the alarm on the list of all alarms but
+       tirggers no alarms.  The current state of the alarm will be
+       maintained and restored from the Alarms.DB file in the project
+       directory.  The alarm manager will scope into the object value
+       for the alarm (passed to it as the parameter) to get access to
+       all of the variables given as the field names.  These field names
+       are defined in the ALARMS.INI file.                                  }
+    Name     = Root\UniqueID;
+    Message  = Description;
+    \AlarmManager\Register(Self);
+  ]
+]
+
+AlarmsMain [
+   { For this example, we will trigger the alarm on Value being non-zero.
+     Use whatever alarm test is appropriate for your point.                 }
+
+  {*************************************************************************}
+  { Handle alarm triggering and returning to normal                         }
+  {*************************************************************************}
+
+  If Edge(AlarmFlag, 1);
+  [
+     { Set up the variables: Name, Message, Operator, Area, Type
+       for the alarm being activated before calling \Active.  If these
+       variables don't change, there is no need to set them.  For
+       multiple alarms, one or more of the variables will need to change. }
+    \AlarmManager\Active(Self);
+  ]
+
+  If Edge(AlarmFlag, 0);
+  [
+    IfThen (!AlarmInhibit,
+     { Set up the variables: Name, Message, Operator, Area, Type
+       for the alarm being activated before calling \Normal.  If these
+       variables don't change, there is no need to set them.  For
+       multiple alarms, one or more of the variables will need to change. }
+      \AlarmManager\Normal(Self);
+    );
+  ]
+
+  {*************************************************************************}
+  { Handle alarm inhibits                                                   }
+  {*************************************************************************}
+
+  If Edge(AlarmInhibit, 1);
+  [
+     { Set up the variables: Name, Message, Operator, Area, Type
+       for the alarm being activated before calling \Disable.  If these
+       variables don't change, there is no need to set them.  For
+       multiple alarms, one or more of the variables will need to change. }
+    \AlarmManager\Disable(Self);
+  ]
+
+  If Edge(AlarmInhibit, 0);
+  [
+     { Set up the variables: Name, Message, Operator, Area, Type
+       for the alarm being activated before calling \Enable.  If these
+       variables don't change, there is no need to set them.  For
+       multiple alarms, one or more of the variables will need to change. }
+    \AlarmManager\Enable(Self);
+  ]
+
+  {*************************************************************************}
+  { If alarming is turned off for this point, stop running this module      }
+  {*************************************************************************}
+
+  If PickValid(Priority == 0, 1);
+  [
+    \AlarmManager\UnRegister(Self);
+     { Killing this module only makes sense here if there ALL of the
+       alarms are off }
+    Slay(Self, 0);
+  ]
+
+
+   { Place a copy of the code which is found normally in \AlarmManager\IsUnAck()
+     here to avoid the RAM overhead of calling the module.  This code
+     determines if the alarm is current unacknowledged.                     }
+  Owner\Unacknowledged[AlarmIndex] = GetByte(DBValue(\AlarmManager\DBSysVal, Name, 0), 1) == 0x31 { 1 };
+
+   { Set to error code when an alarm is active and not inhibited, otherwise to 0 }
+  Owner\AlarmActive[AlarmIndex] = AlarmFlag = !AlarmInhibit && Value != 0 && Priority > 0;
+]
+
+{ End of Alarms }
+>
+
+<
+{============================= LogFileName =================================}
+{ This optional launched module is called by the data logger to set the     }
+{ name of the current log file for this point.  If this module doesn't      }
+{ exist, the logger will use the LogFileName module in the \Code.           }
+{ The .DAT file extension will be automatically added if not specified here.}
+{ This example sets the log file name to a new file every day with the      }
+{ name being the point name concatenated with the date and with the path    }
+{ being that specified by the Settings.Dynamic variable called LogPath.     }
+{ If this module is placed in the application's APPMOD.SRC file rather than }
+{ here, this naming convention will be adopted by all points which do not   }
+{ have a LogFileName module defined.                                        }
+{===========================================================================}
+LogFileName
+(
+  Object                      { Object value of the point to get to current
+                                log file name for.                          };
+  NamePtr                     { Pointer to variable where the name is set   };
+)
+
+LogFileNameInit [
+  If 1 LogFileName;
+  [
+    { Invalidate the Object parameter since we know who we are and it uses
+      less RAM if the Object parameter is invalid rather than an object
+      value.                                                                }
+    Object = Invalid;
+
+    { Set initial name. Use this tag's UniqueID value, in case the tag is renamed. }
+    *NamePtr = Concat(PickValid(\LogPath, ""), \UniqueID, "_", Date(Today, 13 { YYYYMMDD }));
+  ]
+]
+
+LogFileName [
+  If AbsTime(1, 86400 { One day }, 0 { Midnight });
+  [
+    *NamePtr = Concat(PickValid(\LogPath, ""), \UniqueID, "_", Date(Today, 13 { YYYYMMDD }));
+  ]
+
+  If !Valid(NamePtr);
+  [
+     { If the logger goes away (the pointer is no longer valid) no need to
+       set the name any longer }
+    Slay(Self, 0);
+  ]
+]
+
+{ End of LogFileName }
+>
+
+<
+{=============================== Draw ======================================}
+{ This module draws a graphic representation of the point on a page.        }
+{ The parameters can be any that are appropriate to customize the appearance}
+{ of the graphics.  The number of parameters should be minimized to reduce  }
+{ the number that the user must fill in to configure the object.            }
+{ The area occupied by the GUI statements in this module define the area    }
+{ occupied on the screen for selection with the pick tool.                  }
+{===========================================================================}
+Draw
+(
+  OnColor                     { Color when the value is non-zero            };
+  OffColor                    { Color when the value is zero                };
+)
+
+[
+  {*************************************************************************}
+  { The DrawLabel variable specifies the name of the variable defined in    }
+  { the Settings.Dynamic file which will be used to label the previews of   }
+  { this drawing object during configuration.  This is done so that text    }
+  { can be easily translated.                                               }
+  {*************************************************************************}
+  Constant DrawLabel = "TemplateDrawLabel";
+
+  Persistent LastOnColor      { Previously chosen On color during config.   };
+  Persistent LastOffColor     { Previously chosen Off color during config.  };
+
+  Panel Module                { This module must have this name.  It will
+                                be called by the configuration code in VTS
+                                to edit the parameters to the Draw.  This
+                                module need not exist if there are no
+                                parameters to the Draw.  If this module does
+                                not exist, the default configuration module
+                                will be used in its place (not reccommended).};
+
+  {*************************************************************************}
+  { Prevent palcement with the mouse - put at a fixed screen location       }
+  {*************************************************************************}
+  { This code is commented out because we don't want to use this feature here }
+  NoPlace = 1                 { Setting this variable to a 1 here will
+                                inform the VTS code that this drawing
+                                object should not be placed on the screen
+                                with the mouse.  The coordinates used to
+                                place the object on the screen are given
+                                by the default values of the next four
+                                variables declared.                         };
+
+  {**************************************************************************}
+  { Use the custom placement code rather than the default if the PlaceObject }
+  { variable is defined.  It need not be set to any value, its mere          }
+  { existence is enough.  The PlaceObject module must be defined at the root }
+  { of the point module for this to have any effect.                         }
+  {**************************************************************************}
+  { This code is commented out because we don't want to use this feature here }
+  Shared PlaceObject;
+  
+
+  Left   = 0                  { Where the AddObj should place this thing    };
+  Top    = 0;
+  Right  = 599;
+  Bottom = 799;
+  
+
+  { These variable are read by the VTS code at configuration time to determine
+    the size of the GUITransform to place on the screen for this drawing
+    module.  They are typically set by the Panel module according to the
+    parameter entered by the user.  If they are not defined or are invalid,
+    the module reference box size will be used.  They are useful for setting
+    the size of bitmaps when the size is not know until the file is chosen. }
+  DrawWidth;
+  DrawHeight;
+
+  {*************************************************************************}
+  { Custom configuration module                                             }
+  {*************************************************************************}
+  { This code is commented out because we don't want to use this feature here }
+  Configure Module            { The presence of this module declaration
+                                informs the VTS configuration code that the
+                                parameters for this drawing object should be
+                                configured by calling this module rather
+                                than the Panel module code.  Unlike the
+                                Panel module, this module is called without
+                                any window.                                 };
+  
+
+]
+
+DrawInit [
+  If 1 Draw;
+  [
+    {***********************************************************************}
+    { Default parameter setup section                                       }
+    {***********************************************************************}
+
+     { In preview mode (when the user selects which way to draw the
+       object) and during placement of the object on the page, this
+       module is called with no parameters.  Use this fact to draw
+       the object in a sensible way when this happens.                      }
+    IfThen (NParm(Self) == 0,
+       { We will use the colors last configured for one of these points }
+       { The \DefaultOnColor and \DefaultOffColor variables are to be
+         defined in the Settings.Dynamic file so that they are relatively easy
+         to change with a text editor.  Avoid using hard coded text strings
+         and constants in the code so that they can be translated and
+         modified easily.                                                   }
+      OnColor  = PickValid(LastOnColor,  \DefaultOnColor);
+      OffColor = PickValid(LastOffColor, \DefaultOffColor);
+    );
+  ]
+]
+
+Draw [
+  {*************************************************************************}
+  { Actual drawing section                                                  }
+  {*************************************************************************}
+
+   { It is preferable to keep the drawing objects on a 4n+1 pixels dimensions
+     to snap onto the default grid.  This size will be used as the default
+     drawing size when it is placed on the page.                            }
+   { The reference to the \Editing flag tests when the system is in edit
+     mode (the tool bar is open).  Using this flag allows us to display a
+     yellow box in the location for the object when it is invalid during
+     editing so it can be easily found.                                     }
+  GUIRectangle(0,16,16,0,
+               1,1,1,1,1,0,0,
+               1,0,0,0,0,
+               PickValid(Value ? OnColor : OffColor,
+                         -1 { This is the color which will be
+                              displayed when the value is invalid }),
+               \Editing && ! Valid(Value) ? 14 { Yellow } : -1);
+
+    { Display the questionable data flag as a question mark on top of the
+      rectangle.  Questionable flag indication should not obscure the
+      actual data indication. }
+  GUIText(0,16,16,0,
+          1,1,1,1,1,0,0,
+          PickValid(Questionable, 1) || Valid(ManualValue) { Visibility },
+          0,0,0,0,
+          -1, 0 { Black marks }, 0 { Default font },
+          4, 4 { Centering },
+          Concat((PickValid(Questionable, 0))?("?"):(""), (Valid(ManualValue))?("!"):("")));
+
+  \Common(0, 16, 16, 0);
+]
+
+<
+{============================= Draw\Panel ==================================}
+{ This module is called when the object is placed on the page.  It prompts  }
+{ the user configuring the object for the parameters to the Draw.           }
+{ The area of the GUI statements called within this code define the size    }
+{ of the dialog box.  A preview of the object will also be shown within the }
+{ dialog box.  This code defines the area above the preview.                }
+{ The panel modules use the "P" modules defined in \DialogLibrary.  These   }
+{ modules are also used in the ConfigFolder code.  There is no restriction  }
+{ to defining the user interface code although the use of the "P" modules   }
+{ simplifies many common requirements.                                      }
+{ Some of the parameters may be set automatically and not require user      }
+{ input.                                                                    }
+{===========================================================================}
+Panel
+(
+  Parm                        { Array of parameters to edit.  These
+                                parameters will be invalid if this is a new
+                                page object, or alreay have values in the
+                                case of the object being edited.  The size
+                                of the array will be equal to the number
+                                of parameters in the Draw.                  };
+  PtrWaitClose                { Pointer to FLAG - Set this true to prevent
+                                the panel window from closing when OK is
+                                pressed. Used in conjunction with the
+                                Trigger variable.                           };
+)
+
+[
+  Trigger                     { Variable to be set to zero by the PEditField
+                                while the user is typing in a new value. Will
+                                be set to a non-zero value when the change is
+                                complete.                                   };
+
+  {*************************************************************************}
+  { AutoConfig                                                              }
+  {*************************************************************************}
+  { This code is commented out because we don't want to use this feature here
+  AutoConfig = 1              { Setting this variable with a default value
+                                of 1 will cause this module to be called
+                                without a dialog box.  This allows this
+                                function to set the parameters without
+                                prompting the user for input.               };
+  }
+]
+
+PanelInit [
+  If 1 PanelMain;
+  [
+     { Set up the parameter values if they have not been set yet }
+    Parm[0] = PickValid(Parm[0], LastOnColor,  \DefaultOnColor);
+    Parm[1] = PickValid(Parm[1], LastOffColor, \DefaultOffColor);
+  ]
+]
+
+PanelMain [
+   { Let the caller know when its ok to close }
+  *PtrWaitClose = PickValid(Trigger, 1) == 0;
+
+  {*************************************************************************}
+  { Saving of drawing object parameters for next time                       }
+  {*************************************************************************}
+
+   { Save the parmeters selected by the user so that the next time one of
+     these objects is placed on the page, it will default to the last
+     parameters used.                                                       }
+  LastOnColor  = Parm[0];
+  LastOffColor = Parm[1];
+
+  {*************************************************************************}
+  { Draw the user interface on the dialog box                               }
+  {*************************************************************************}
+
+   { Draw the controls which accept the user input }
+   { If the window is not large enough to hold all of the drawing objects,
+     add a GUIRectangle with visibility off which defines the area which
+     is needed. This can be convenient when the drawing is done by calling
+     sub modules or by using Z statements.                                  }
+  GUITransform(10, 10, 120, 30          { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(0       { Parameter number to edit      },
+                                         \GetPhrase("OnColorLabel"),
+                                         1       { Data type accepted is numeric },
+                                         Invalid { Automatic focusID selection   },
+                                         Trigger));
+
+  GUITransform(10, 50, 120, 70          { Boundaries of transform        },
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(1       { Parameter number to edit      },
+                                         \GetPhrase("OffColorLabel"),
+                                         1       { Data type accepted is numeric },
+                                         Invalid { Automatic focusID selection   },
+                                         Trigger));
+]
+{ End of Draw\Panel }
+>
+
+{ End of Draw }
+>

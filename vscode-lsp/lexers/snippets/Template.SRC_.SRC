@@ -1,0 +1,493 @@
+
+(
+	Name <:TagField("SQL_VARCHAR(64)", "Name", 0 ):> ;
+	Area <:TagField("SQL_VARCHAR(255)", "Area", 1 ):> ;
+	Description <:TagField("SQL_VARCHAR(255)", "Description", 2 ):> ;
+	IODevice <:TagField("SQL_VARCHAR(255)", "I/O Device Name", 3 ):> ;
+	Address <:TagField("SQL_VARCHAR(255)", "Input Address", 4 ):> ;
+	ScanInterval <:TagField("SQL_VARCHAR(255)", "Scan Interval (Seconds)", 5 ):> ;
+	ManualValue <:TagField("SQL_VARCHAR(255)", "Manual Data Value", 6 ):> ;
+	Owner <:TagField("SQL_VARCHAR(255)", "Owning Point Name", 7 ):> ;
+	ContributionType <:TagField("SQL_VARCHAR(255)", "Type of Contribution to Owner", 8 ):> ;
+	Questionable <:TagField("SQL_VARCHAR(255)", "Questionable Data Flag", 9 ):> ;
+	Quality <:TagField("SQL_VARCHAR(255)", "Data Quality Point", 10):> ;
+	Container <:TagField("SQL_VARCHAR(255)", "Container Point Name", 11):> ;
+	Priority <:TagField("SQL_VARCHAR(255)", "Alarm Priority", 12):> ;
+	AlarmInhibit <:TagField("SQL_LONGVARCHAR", "Alarm Inhibit", 13):> ;
+	LogRate <:TagField("SQL_VARCHAR(50)", "LogRate", 14):> ;
+	HelpKey <:TagField("SQL_VARCHAR(255)", "Help System Index", 15):> ;
+)
+[
+	Constant #IODevice = 3;
+	Constant #Address = 4;
+	Constant #ScanInterval = 5;
+	Constant #ManualValue = 6;
+	Constant #Owner = 7;
+	Constant #ContributionType = 8;
+	Constant #Questionable = 9;
+	Constant #Quality = 10;
+	Constant #Container = 11;
+	Constant #Priority = 12;
+	Constant #AlarmInhibit = 13;
+	Constant #LogRate = 14;
+	Constant DrawLabel = "TemplatePointLabel";
+	Root ;
+	Refresh Module ;
+	RawValue ;
+	Value (5) ;
+	LogFileName Module ;
+	ExternalValue = 0 ;
+	LogObject ;
+	Alarms Module ;
+	AlarmObject ;
+	[ (PLUGINS)
+	Shared ConfigFolder = "TemplateConfig";
+	Shared Common = "TemplateCommon";
+	]
+	[ (GRAPHICS)
+	Draw Module ;
+	Shared BarGraph ;
+	]
+	Contributors ;
+	ContributorAdded Module ;
+	ContributorDeleted Module ;
+	[ (GROUPS)
+	Shared GrpContainer ;
+	]
+	ContainerIndex ;
+	Data0Index ;
+	Data1Index ;
+	Data2Index ;
+	Data3Index ;
+	AlarmIndex ;
+	QualityIndex ;
+	Data0 ;
+	Data1 ;
+	Data2 ;
+	Data3 ;
+	Data0Contributors ;
+	Data1Contributors ;
+	Data2Contributors ;
+	Data3Contributors ;
+	AlarmActive ;
+	UnacknowledgedAlarm ;
+	AlarmContributors ;
+	InManual ;
+	ManualContributors ;
+	GoodQuality ;
+	QualityContributors ;
+	QuestionableCount ;
+	QuestionableContributors ;
+	Average ;
+	AndData ;
+	Values ;
+	Shared TempData ;
+	PlaceObject Module ;
+	
+]
+TemplateInit [
+	If 1 Template;
+	[
+	Root = Self ;
+	Refresh();
+	]
+]
+	
+Template [
+	If Watch(1, RawValue, ExternalValue);
+	[
+	IfThen (!ExternalValue || Valid(ManualValue),
+		Value = PickValid(ManualValue, RawValue);
+	);
+	]
+	If Watch(1, Value);
+	[
+	IfThen (And(ContributionType, 0x0F),
+		IfThen (Bit(ContributionType, 0),
+		Owner\Data0[Data0Index] = Value;
+	);
+	IfThen (Bit(ContributionType, 1),
+		Owner\Data1[Data1Index] = Value;
+	);
+	IfThen (Bit(ContributionType, 2),
+		Owner\Data2[Data2Index] = Value;
+	);
+	IfThen (Bit(ContributionType, 3),
+		Owner\Data3[Data3Index] = Value;
+	);
+	);
+	]
+	Container\Values[ContainerIndex] = Value;
+	Owner\GoodQuality[QualityIndex] = PickValid(Quality\Value != 0, 1);
+	Average = Mean(Values[0], ArraySize(Values, 0));
+	If WatchArray(1, Values[0], ArraySize(Values, 0));
+	[
+	TempData = New(ArraySize(Values, 0));
+	ArrayOp2(TempData[0], Values[0], ArraySize(Values, 0), 0);
+	ArrayOp1(TempData[0], ArraySize(TempData, 0), 0, 12 );
+	AndData = Sum(TempData[0], ArraySize(TempData, 0)) ==
+	AValid(TempData[0], ArraySize(TempData, 0));
+	TempData = Invalid;
+	]
+]
+<
+Refresh
+(
+	Parm 
+)
+Refresh [
+	If 1;
+	[
+	IfThen (ValueType(Parm[#IODevice]) == 4 ,
+		Parm[#IODevice] = Scope(\Code, Parm[#IODevice])
+	);
+	IfThen (ValueType(IODevice) == 4 ,
+		IODevice = Scope(\Code, IODevice)
+	);
+	IfThen (!Valid(ScanInterval),
+		ScanInterval = 0;
+	);
+	IfThen (PickValid(Parm[#IODevice] != IODevice, 1) ||
+	PickValid(Parm[#ScanInterval] != ScanInterval, 1) ||
+	PickValid(Parm[#Address], "") != PickValid(Address, ""),
+		Parm[#IODevice]\Driver\DelRead(Parm[#Address], &RawValue, Parm[#ScanInterval]);
+	    IODevice\Driver\AddRead(Address ,
+            1 ,
+            &RawValue ,
+            ScanInterval );
+	);
+	ManualValue = Cast(ManualValue, 3 );
+	IfElse (Valid(ManualValue),
+		Value = ManualValue;
+	IfThen (!ExternalValue,
+		Value = RawValue;
+	));
+	IfThen (ValueType(Quality) == 4 ,
+		Quality = Scope(\Code, Quality);
+	);
+	Questionable = PickValid(Cast(Questionable, 3 ) != 0, 1);
+	IfThen (ValueType(Parm[#Owner]) == 4 ,
+		Parm[#Owner] = Scope(\Code, Parm[#Owner])
+	);
+	IfThen (ValueType(Owner) == 4 ,
+		Owner = Scope(\Code, Owner)
+	);
+	IfElse(PickValid(Owner != Parm[#Owner], 1) || ContributionType != Parm[#ContributionType], Execute(
+	IfThen (Bit(Parm[#ContributionType], 0),
+		\DeleteContributor("Data0Contributors", "Data0", Invalid, Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 1),
+		\DeleteContributor("Data1Contributors", "Data1", Invalid, Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 2),
+		\DeleteContributor("Data2Contributors", "Data2", Invalid, Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 3),
+		\DeleteContributor("Data3Contributors", "Data3", Invalid, Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 4),
+		\DeleteContributor("AlarmContributors", "AlarmActive", Invalid, Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 5),
+		\DeleteContributor("ManualContributors", Invalid, "InManual", Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 6),
+		\DeleteContributor("QualityContributors", "GoodQuality", Invalid, Parm[#Owner], Root, Invalid);
+	);
+	IfThen (Bit(Parm[#ContributionType], 7),
+		\DeleteContributor("QuestionableContributors", Invalid, "QuestionableCount", Parm[#Owner], Root, Invalid);
+	);
+	IfElse (Bit(ContributionType, 0),
+		\AddContributor("Data0Contributors", "Data0", Invalid, Owner, Root, &Data0Index, Value, Invalid);
+	Data0Index = Invalid;
+	);
+	IfElse (Bit(ContributionType, 1),
+		\AddContributor("Data1Contributors", "Data1", Invalid, Owner, Root, &Data1Index, Value, Invalid);
+	Data1Index = Invalid;
+	);
+	IfElse (Bit(ContributionType, 2),
+		\AddContributor("Data2Contributors", "Data2", Invalid, Owner, Root, &Data2Index, Value, Invalid);
+	Data2Index = Invalid;
+	);
+	IfElse (Bit(ContributionType, 3),
+		\AddContributor("Data3Contributors", "Data3", Invalid, Owner, Root, &Data3Index, Value, Invalid);
+	Data3Index = Invalid;
+	);
+	IfElse (Bit(ContributionType, 4),
+		\AddContributor("AlarmContributors", "AlarmActive", Invalid, Owner, Root,
+		&AlarmIndex, Invalid , Invalid);
+	    AlarmIndex = Invalid;
+	);
+	IfThen (Bit(ContributionType, 5),
+		\AddContributor("ManualContributors", Invalid, "InManual", Owner, Root, Invalid, Invalid,
+		Valid(ManualValue));
+	);
+	IfElse (Bit(ContributionType, 6),
+		\AddContributor("QualityContributors", "GoodQuality", Invalid, Owner, Root,
+		&QualityIndex, PickValid(Quality\Value == 0, 0) ,
+		Invalid);
+	QualityIndex = Invalid;
+	);
+	IfThen (Bit(ContributionType, 7),
+		\AddContributor("QuestionableContributors", Invalid, "QuestionableCount", Owner, Root, Invalid, Invalid,
+		Questionable);
+	);
+	);
+	Execute(
+	IfThen(Bit(ContributionType, 5) && Valid(ManualValue) != Valid(Parm[#ManualValue]),
+		\DeleteContributor("ManualContributors", Invalid, "InManual", Parm[#Owner], Root,
+		Valid(Parm[#ManualValue]));
+	\AddContributor("ManualContributors", Invalid, "InManual", Owner, Root, Invalid, Invalid,
+		Valid(ManualValue));
+	);
+	IfThen(Bit(ContributionType, 7) &&
+	(Questionable != Parm[#Questionable] || Valid(Questionable) != Valid(Parm[#Questionable])),
+		\DeleteContributor("QuestionableContributors", Invalid, "QuestionableCount", Parm[#Owner],
+		Root, Parm[#Questionable]);
+	\AddContributor("QuestionableContributors", Invalid, "QuestionableCount", Owner,
+		Root, Invalid, Invalid, Questionable);
+	);
+	));
+	IfThen (ValueType(Parm[#Container]) == 4 ,
+		Parm[#Container] = Scope(\Code, Parm[#Container])
+	);
+	IfThen (ValueType(Container) == 4 ,
+		Container = Scope(\Code, Container)
+	);
+	IfThen (PickValid(Parm[#Container] != Container, 1),
+		\DeleteContributor("Contributors" ,
+		Parm[#Container], Root);
+	\AddContributor("Contributors" ,
+		Container, Root,
+		&ContainerIndex );
+	);
+	IfThen (PickValid(Parm[#LogRate] != LogRate, 1),
+		Slay(LogObject, 0);
+	IfThen (LogRate > 0,
+		LogObject = \Logger(Root,
+		LogRate,
+		Invalid,
+		100000 ,
+		Int(60 / LogRate) );
+	);
+	);
+	IfThen (!Valid(AlarmObject) && Priority > 0 &&
+	ValueType(\AlarmManager) == 7 ,
+		AlarmObject = Alarms();
+	);
+	Return(0);
+	]
+]
+>
+<
+ContributorAdded
+(
+	VariableName ;
+	ArrayName ;
+	CountName ;
+	NewPoint ;
+	N ;
+	Index ;
+)
+[
+	NewArray ;
+]
+ContributorAdded [
+	If 1;
+	[
+	IfThen (StriCmp(VariableName, "AlarmContributors"),
+		NewArray = New(N);
+	ArrayOp2(NewArray[0], UnacknowledgedAlarm[0], Index, 0);
+	ArrayOp2(NewArray[Index + 1], UnacknowledgedAlarm[Index], N - Index - 1, 0);
+	UnacknowledgedAlarm = NewArray;
+	);
+	Return(0);
+	]
+]
+>
+<
+ContributorDeleted
+(
+	VariableName ;
+	ArrayName ;
+	CountName ;
+	OldPoint ;
+	N ;
+	Index ;
+)
+[
+	NewArray ;
+]
+ContributorDeleted [
+	If 1;
+	[
+	IfThen (StriCmp(VariableName, "AlarmContributors"),
+		NewArray = New(N);
+	ArrayOp2(NewArray[0], UnacknowledgedAlarm[0], Index, 0);
+	ArrayOp2(NewArray[Index], UnacknowledgedAlarm[Index + 1], N - Index, 0);
+	UnacknowledgedAlarm = NewArray;
+	);
+	Return(0);
+	]
+]
+>
+<
+Alarms
+[
+	Name ;
+	Operator = "";
+	Type = 1000;
+	Message ;
+	LastValue ;
+	AlarmFlag ;
+]
+AlarmsInit [
+	If \AlarmManager\Started AlarmsMain;
+	[
+	Name = Root\UniqueID;
+	Message = Description;
+	\AlarmManager\Register(Self);
+	]
+]
+AlarmsMain [
+	If Edge(AlarmFlag, 1);
+	[
+	    \AlarmManager\Active(Self);
+	]
+	If Edge(AlarmFlag, 0);
+	[
+	IfThen (!AlarmInhibit,
+		\AlarmManager\Normal(Self);
+	);
+	]
+	If Edge(AlarmInhibit, 1);
+	[
+	    \AlarmManager\Disable(Self);
+	]
+	If Edge(AlarmInhibit, 0);
+	[
+	    \AlarmManager\Enable(Self);
+	]
+	If PickValid(Priority == 0, 1);
+	[
+        \AlarmManager\UnRegister(Self);
+        Slay(Self, 0);
+	]
+	Owner\Unacknowledged[AlarmIndex] = GetByte(DBValue(\AlarmManager\DBSysVal, Name, 0), 1) == 0x31 ;
+	Owner\AlarmActive[AlarmIndex] = AlarmFlag = !AlarmInhibit && Value != 0 && Priority > 0;
+]
+>
+<
+LogFileName
+(
+	Object ;
+	NamePtr ;
+)
+LogFileNameInit [
+	If 1 LogFileName;
+	[
+	    Object = Invalid;
+	    *NamePtr = Concat(PickValid(\LogPath, ""), \UniqueID, "_", Date(Today, 13 ));
+	]
+]
+LogFileName [
+	If AbsTime(1, 86400 , 0 );
+	[
+	    *NamePtr = Concat(PickValid(\LogPath, ""), \UniqueID, "_", Date(Today, 13 ));
+	]
+	If !Valid(NamePtr);
+	[
+	    Slay(Self, 0);
+	]
+]
+>
+<
+Draw
+(
+	OnColor ;
+	OffColor ;
+)
+[
+	Constant DrawLabel = "TemplateDrawLabel";
+	Persistent LastOnColor ;
+	Persistent LastOffColor ;
+	Panel Module ;
+	NoPlace = 1 ;
+	Shared PlaceObject;
+	Left = 0 ;
+	Top = 0;
+	Right = 599;
+	Bottom = 799;
+	DrawWidth;
+	DrawHeight;
+	Configure Module ;
+	
+]
+DrawInit [
+	If 1 Draw;
+	[
+	IfThen (NParm(Self) == 0,
+		OnColor = PickValid(LastOnColor, \DefaultOnColor);
+	    OffColor = PickValid(LastOffColor, \DefaultOffColor);
+	);
+	]
+]
+Draw [
+	GUIRectangle(0,16,16,0,
+		1,1,1,1,1,0,0,
+		1,0,0,0,0,
+		PickValid(Value ? OnColor : OffColor,
+		-1 ),
+		\Editing && ! Valid(Value) ? 14 : -1);
+	GUIText(0,16,16,0,
+		1,1,1,1,1,0,0,
+		PickValid(Questionable, 1) || Valid(ManualValue) ,
+		0,0,0,0,
+		-1, 0 , 0 ,
+		4, 4 ,
+		Concat((PickValid(Questionable, 0))?("?"):(""), (Valid(ManualValue))?("!"):("")));
+	\Common(0, 16, 16, 0);
+]
+<
+Panel
+(
+	Parm ;
+	PtrWaitClose ;
+)
+[
+	Trigger ;
+	;
+	
+]
+PanelInit [
+	If 1 PanelMain;
+	[
+	    Parm[0] = PickValid(Parm[0], LastOnColor, \DefaultOnColor);
+	    Parm[1] = PickValid(Parm[1], LastOffColor, \DefaultOffColor);
+	]
+]
+PanelMain [
+	*PtrWaitClose = PickValid(Trigger, 1) == 0;
+	LastOnColor = Parm[0];
+	LastOffColor = Parm[1];
+	GUITransform(10, 10, 120, 30 ,
+		1, 1, 1, 1, 1 ,
+		0, 0, 1, 0 ,
+		0, 0, 0 ,
+		\DialogLibrary\PEditField(0 ,
+		\GetPhrase("OnColorLabel"),
+		1 ,
+		Invalid ,
+		Trigger));
+	GUITransform(10, 50, 120, 70 ,
+		1, 1, 1, 1, 1 ,
+		0, 0, 1, 0 ,
+		0, 0, 0 ,
+		\DialogLibrary\PEditField(1 ,
+		\GetPhrase("OffColorLabel"),
+		1 ,
+		Invalid ,
+		Trigger));
+]
+>
+>

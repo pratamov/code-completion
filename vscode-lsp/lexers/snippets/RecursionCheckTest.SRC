@@ -1,0 +1,797 @@
+{============================= _RecursionCheck ===============================}
+{=============================================================================}
+(
+  Framework;
+  Owner;
+)
+[
+  [ (FIXTURE)
+    TestFixture;
+  ]
+  Case1Mod  Module              { Test source modules                         };
+  Case2Mod  Module;
+  Case3Mod  Module;
+  Case4Mod  Module;
+  Case5Mod  Module;
+  Case6Mod  Module;
+  Case7Mod  Module;
+  Case8Mod  Module;
+  Case9Mod  Module;
+  Case10Mod  Module;
+  Case11Mod  Module;
+  Case12Mod  Module;
+  Case13Mod  Module;
+  Case14Mod  Module;
+  Case15Mod  Module;
+  Case16Mod  Module;
+  Case17Mod  Module;
+  Case18Mod  Module;
+  Case19Mod  Module;
+  Case20Mod  Module;
+  Case21Mod  Module;
+  Case22Mod  Module;
+  Case23Mod  Module;
+  Case24Mod  Module;
+  Case25Mod  Module;
+  Case26Mod  Module;
+  Case27Mod  Module;
+
+  TargetModValue                { Module value of target module               };
+  SourceModValue                { Module value of source module               };
+  Layer                         { The layer object for the VTS layer          };
+  LibXMod Module                { Module used for LibX mockup                 };
+  LibX                          { LibX mockup                                 };
+]
+
+Init [
+  If 1 WaitLayer;
+  [
+    TargetModValue = Cast(FindVariable("TargetMod", FindVariable("Library", ParentObject(Self()), 0, 0), 0, 0), 11{module});
+    Framework\GetAppInstance("46347dd5-cb24-11d1-a130-0060971477af", &Layer);
+  ]
+]
+
+WaitLayer [
+  If Valid(Layer) Case1;
+  [
+    LibX = LibXMod();
+  ]
+]
+
+Case1 [
+  {***** Parameter-less module with no calls *****}
+  If 1 Case2;
+  [
+    SourceModValue = Cast(FindVariable("Case1Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "No calls");
+  ]
+]
+
+Case2 [
+  {***** Parameter-less module with a non-recursive call *****}
+  If 1 Case3;
+  [
+    SourceModValue = Cast(FindVariable("Case2Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "Single xform");
+  ]
+]
+
+Case3 [
+  {***** Parameter-less module with multiple non-recursive calls *****}
+  If 1 Case4;
+  [
+    SourceModValue = Cast(FindVariable("Case3Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "Multiple xforms");
+  ]
+]
+
+Case4 [
+  {***** Parameter-less module with a direct recursive call *****}
+  If 1 Case5;
+  [
+    SourceModValue = Cast(FindVariable("Case4Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Direct recursive call");
+  ]
+]
+
+Case5 [
+  {***** Parameter-less module with a 
+  direct library recursive call *****}
+  If 1 Case6;
+  [
+    SourceModValue = Cast(FindVariable("Case5Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Direct library recursive call");
+  ]
+]
+
+Case6 [
+  {***** Parameter-less module with a transformed library recursive call *****}
+  If 1 Case7;
+  [
+    SourceModValue = Cast(FindVariable("Case6Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "XFormed recursive call");
+  ]
+]
+
+Case7 [
+  {***** Parameter-less module with an indirect recursive call *****}
+  If 1 Case8;
+  [
+    SourceModValue = Cast(FindVariable("Case7Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Indirect recursive call");
+  ]
+]
+
+Case8 [
+  {***** Parameter-less module with a transformed indirect library recursive call *****}
+  If 1 Case9;
+  [
+    SourceModValue = Cast(FindVariable("Case8Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "XFormed indirect library recursive call");
+  ]
+]
+
+Case9 [
+  {***** Parameter-less module with a transformed indirect library recursive call
+         that is not the first or last. *****}
+  If 1 Case10;
+  [
+    SourceModValue = Cast(FindVariable("Case9Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Middle XFormed indirect library recursive call");
+  ]
+]
+
+Case10 [
+  {***** Parameterised module with no parameter typing and a direct recursive call.
+         We cannot determine whether this is safe in the absence of parameter typing. *****}
+  If 1 Case11;
+  [
+    SourceModValue = Cast(FindVariable("Case10Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "No param type direct call");
+  ]
+]
+
+Case11 [
+  {***** Parameterised module with no parameter typing and a transformed recursive call.
+         We cannot determine whether this is safe in the absence of parameter typing. *****}
+  If 1 Case12;
+  [
+    SourceModValue = Cast(FindVariable("Case11Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "No param type XFormed call");
+  ]
+]
+
+Case12 [
+  {***** Parameterised module with parameter typing and a non-recursive direct call *****}
+  If 1 Case13;
+  [
+    SourceModValue = Cast(FindVariable("Case12Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "Param direct call");
+  ]
+]
+
+Case13 [
+  {***** Parameterised module with parameter typing and a transformed non-recursive call *****}
+  If 1 Case14;
+  [
+    SourceModValue = Cast(FindVariable("Case13Mod", Self(), 0, 0), 11{module});
+    Framework\AssertTRUE(Owner(TargetModValue, SourceModValue), "Param XFormed call");
+  ]
+]
+
+Case14 [
+  {***** Parameterised module with parameter typing and a recursive direct call *****}
+  If 1 Case15;
+  [
+    SourceModValue = Cast(FindVariable("Case14Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Param recursive direct call");
+  ]
+]
+
+Case15 [
+  {***** Parameterised module with parameter typing and a transformed recursive call *****}
+  If 1 Case16;
+  [
+    SourceModValue = Cast(FindVariable("Case15Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Param recursive XFormed call");
+  ]
+]
+
+Case16 [
+  {***** Parameterised module with a 2-deep recursive call via parameter at level 1 *****}
+  If 1 Case17;
+  [
+    SourceModValue = Cast(FindVariable("Case16Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Param recursive 2-deep call");
+  ]
+]
+
+Case17 [
+  {***** Parameterised module with a 2-deep recursive call via parameter and XForm at level 1 *****}
+  If 1 Case18;
+  [
+    SourceModValue = Cast(FindVariable("Case17Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Param XForm recursive 2-deep call");
+  ]
+]
+
+Case18 [
+  {***** Parameterised module with a 3-deep recursive call via parameter at level 2 *****}
+  If 1 Case19;
+  [
+    SourceModValue = Cast(FindVariable("Case18Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "XForm recursive 3-deep call. Param at level 2");
+  ]
+]
+
+Case19 [
+  {***** Parameterised module with a 3-deep recursive call via parameters at levels 1 & 2 *****}
+  If 1 Case20;
+  [
+    SourceModValue = Cast(FindVariable("Case19Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "XForm recursive 3-deep call. Param at levels 1 & 2");
+  ]
+]
+
+Case20 [
+  {***** Parameterised module with a 3-deep recursive call across libraries via
+         parameters at levels 1 & 2 *****}
+  If 1 Case21;
+  [
+    SourceModValue = Cast(FindVariable("Case20Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "XForm recursive 3-deep call across libs");
+  ]
+]
+
+Case21 [
+  {***** Parameter-less module dropping onto self *****}
+  If 1 Case22;
+  [
+    Framework\AssertFALSE(Owner(TargetModValue, TargetModValue), "Drop onto self");
+  ]
+]
+
+Case22 [
+  {***** Parameter-less module with a direct recursive call like pages *****}
+  If 1 Case23;
+  [
+    SourceModValue = Cast(FindVariable("Case21Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Page like direct library recursive call");
+  ]
+]
+
+Case23 [
+  {***** Parameter-less module with a direct library recursive call like pages *****}
+  If 1 Case24;
+  [
+    SourceModValue = Cast(FindVariable("Case22Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Page like XFormed recursive call");
+  ]
+]
+
+Case24 [
+  {***** Parameter-less module with an indirect recursive call *****}
+  If 1 Case25;
+  [
+    SourceModValue = Cast(FindVariable("Case23Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Page like indirect recursive call");
+  ]
+]
+
+Case25 [
+  {***** Parameter-less module with a transformed indirect library recursive call *****}
+  If 1 Case26;
+  [
+    SourceModValue = Cast(FindVariable("Case24Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "Page like XFormed indirect library recursive call");
+  ]
+]
+
+Case26 [
+  {***** Parameter-less module with a direct recursive call within a PickValid *****}
+  If 1 Case27;
+  [
+    SourceModValue = Cast(FindVariable("Case25Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "PickValid-embedded recursive call");
+  ]
+]
+
+Case27 [
+  {***** Parameter-less module with a direct library recursive call within a PickValid *****}
+  If 1 Case28;
+  [
+    SourceModValue = Cast(FindVariable("Case26Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "PickValid-embedded library recursive call");
+  ]
+]
+
+Case28 [
+  {***** Parameter-less module with a transformed library recursive call *****}
+  If 1 Done;
+  [
+    SourceModValue = Cast(FindVariable("Case27Mod", Self(), 0, 0), 11{module});
+    Framework\AssertFALSE(Owner(TargetModValue, SourceModValue), "PickValid-embedded XFormed library recursive call");
+  ]
+]
+
+Done [
+  If 1;
+  [
+    Slay(Self(), 0);
+  ]
+]
+
+{======================== _RecursionCheck\LibXMod ============================}
+{ Pretends to be LibX so that the Owner can get at GetWCPath()                }
+{=============================================================================}
+<
+LibXMod
+[
+  LayerRoot;
+]
+
+Main [
+  LayerRoot = Layer;
+]
+{ End of _RecursionCheck\LibXMod }
+>
+
+<
+{======================== _RecursionCheck\Case1Mod ===========================}
+{=============================================================================}
+Case1Mod
+
+Main [
+  GUIRectangle(240, 424, 292, 392,
+               1, 1, 1, 1, 1 { Scaling              },
+               0, 0          { Movement             },
+               1, 0          { Visibility, reserved },
+               0, 0, 0       { Selectability        },
+               Brush(171,0,1), Pen(0,1,1));
+]
+
+{ End of _RecursionCheck\Case1Mod }
+>
+
+<
+{======================== _RecursionCheck\Case2Mod ===========================}
+{=============================================================================}
+Case2Mod
+
+Main [
+   GUITransform(50, 150, 150, 50,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                Variable("Library")\PlainRect());
+]
+
+{ End of _RecursionCheck\Case2Mod }
+>
+
+<
+{======================== _RecursionCheck\Case3Mod ===========================}
+{=============================================================================}
+Case3Mod
+
+Main [
+   GUITransform(50, 150, 150, 50,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                Variable("Library")\PlainRect());
+   GUITransform(250, 350, 350, 250,
+                1, 1, 1, 1, 1 { Scaling              },
+                0, 0          { Movement             },
+                1, 0          { Visibility, Reserved },
+                0, 0, 0       { Selectability        },
+                Variable("Library")\PlainRect());
+]
+
+{ End of _RecursionCheck\Case3Mod }
+>
+
+<
+{======================== _RecursionCheck\Case4Mod ===========================}
+{=============================================================================}
+Case4Mod
+
+Main [
+  \Library\TargetMod();
+]
+
+{ End of _RecursionCheck\Case4Mod }
+>
+
+<
+{======================== _RecursionCheck\Case5Mod ===========================}
+{=============================================================================}
+Case5Mod
+
+Main [
+  Variable("Library")\TargetMod();
+]
+
+{ End of _RecursionCheck\Case5Mod }
+>
+
+<
+{======================== _RecursionCheck\Case6Mod ===========================}
+{=============================================================================}
+Case6Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Variable("Library")\TargetMod());
+]
+
+{ End of _RecursionCheck\Case6Mod }
+>
+
+<
+{======================== _RecursionCheck\Case7Mod ===========================}
+{=============================================================================}
+Case7Mod
+
+Main [
+  Variable("Library")\CallsTargetMod();
+]
+
+{ End of _RecursionCheck\Case7Mod }
+>
+
+<
+{======================== _RecursionCheck\Case8Mod ===========================}
+{=============================================================================}
+Case8Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Variable("Library")\CallsTargetMod());
+]
+
+{ End of _RecursionCheck\Case8Mod }
+>
+
+<
+{======================== _RecursionCheck\Case9Mod ===========================}
+{=============================================================================}
+Case9Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Variable("Library")\PlainRect());
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Variable("Library")\CallsTargetMod());
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Variable("Library")\PlainRect());
+]
+
+{ End of _RecursionCheck\Case9Mod }
+>
+
+<
+{======================== _RecursionCheck\Case10Mod ==========================}
+{=============================================================================}
+Case10Mod
+(
+  P1;
+)
+Main [
+  P1\TargetMod();
+]
+
+{ End of _RecursionCheck\Case10Mod }
+>
+
+<
+{======================== _RecursionCheck\Case11Mod ==========================}
+{=============================================================================}
+Case11Mod
+(
+  P1;
+)
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               P1\TargetMod());
+]
+
+{ End of _RecursionCheck\Case11Mod }
+>
+
+<
+{======================== _RecursionCheck\Case12Mod ==========================}
+{=============================================================================}
+Case12Mod
+(
+  P1 Object<Library>;
+)
+Main [
+  P1\PlainRect();
+]
+
+{ End of _RecursionCheck\Case12Mod }
+>
+
+<
+{======================== _RecursionCheck\Case13Mod ==========================}
+{=============================================================================}
+Case13Mod
+(
+  P1 Object<Library>;
+)
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               P1\PlainRect());
+]
+
+{ End of _RecursionCheck\Case13Mod }
+>
+
+<
+{======================== _RecursionCheck\Case14Mod ==========================}
+{=============================================================================}
+Case14Mod
+(
+  P1 Object<Library>;
+)
+Main [
+  P1\TargetMod();
+]
+
+{ End of _RecursionCheck\Case14Mod }
+>
+
+<
+{======================== _RecursionCheck\Case15Mod ==========================}
+{=============================================================================}
+Case15Mod
+(
+  P1 Object<Library>;
+)
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               P1\TargetMod());
+]
+
+{ End of _RecursionCheck\Case15Mod }
+>
+
+<
+{======================== _RecursionCheck\Case16Mod ==========================}
+{=============================================================================}
+Case16Mod
+(
+  P1 Object<Library>;
+)
+Main [
+  P1\CallsTargetMod();
+]
+
+{ End of _RecursionCheck\Case16Mod }
+>
+
+<
+{======================== _RecursionCheck\Case17Mod ==========================}
+{=============================================================================}
+Case17Mod
+(
+  P1 Object<Library>;
+)
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               P1\CallsTargetMod());
+]
+
+{ End of _RecursionCheck\Case17Mod }
+>
+
+<
+{======================== _RecursionCheck\Case18Mod ==========================}
+{=============================================================================}
+Case18Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Variable("Library")\PCallTargetMod(Variable("Library")));
+]
+
+{ End of _RecursionCheck\Case18Mod }
+>
+
+<
+{======================== _RecursionCheck\Case19Mod ==========================}
+{=============================================================================}
+Case19Mod
+(
+  P1 Object<Library>;
+)
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               P1\PCallTargetMod(Variable("Library")));
+]
+
+{ End of _RecursionCheck\Case19Mod }
+>
+
+<
+{======================== _RecursionCheck\Case20Mod ==========================}
+{=============================================================================}
+Case20Mod
+(
+  P1 Object<Library1>;
+)
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               P1\PCallTargetMod(Variable("Library")));
+]
+
+{ End of _RecursionCheck\Case20Mod }
+>
+
+<
+{======================= _RecursionCheck\Case21Mod ===========================}
+{=============================================================================}
+Case21Mod
+
+Main [
+  Scope(Self(), "Library")\TargetMod();
+]
+
+{ End of _RecursionCheck\Case21Mod }
+>
+
+<
+{======================= _RecursionCheck\Case22Mod ===========================}
+{=============================================================================}
+Case22Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Scope(Self(), "Library")\TargetMod());
+]
+
+{ End of _RecursionCheck\Case22Mod }
+>
+
+<
+{======================= _RecursionCheck\Case23Mod ===========================}
+{=============================================================================}
+Case23Mod
+
+Main [
+  Scope(Self(), "Library")\CallsTargetMod();
+]
+
+{ End of _RecursionCheck\Case23Mod }
+>
+
+<
+{======================= _RecursionCheck\Case24Mod ===========================}
+{=============================================================================}
+Case24Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               Scope(Self(), "Library")\CallsTargetMod());
+]
+
+{ End of _RecursionCheck\Case24Mod }
+>
+
+<
+{======================= _RecursionCheck\Case25Mod ===========================}
+{=============================================================================}
+Case25Mod
+
+Main [
+  PickValid(\Junk\TargetMod, \Library\TargetMod)();
+]
+
+{ End of _RecursionCheck\Case25Mod }
+>
+
+<
+{======================= _RecursionCheck\Case26Mod ===========================}
+{=============================================================================}
+Case26Mod
+
+Main [
+  PickValid(Variable("Junk")\TargetMod, Variable("Library")\TargetMod)();
+]
+
+{ End of _RecursionCheck\Case26Mod }
+>
+
+<
+{======================= _RecursionCheck\Case27Mod ===========================}
+{=============================================================================}
+Case27Mod
+
+Main [
+  GUITransform(196, 284, 368, 196,
+               1 { scale left },  1 { scale bottom },
+               1 { scale right }, 1 { scale top },
+               1 { scale whole }, 0 { trajectory }, 0 { rotation },
+               1 { visibility },  0 { reserved },
+               0 { button },0 { focus ID }, 0 { focus trigger },
+               PickValid(Variable("Junk")\TargetMod, Variable("Library")\TargetMod)());
+]
+
+{ End of _RecursionCheck\Case27Mod }
+>
+{ End of _RecursionCheck }

@@ -1,0 +1,885 @@
+{============================== PMC1001 =======================================}
+{ Software PMC simulator for test purposes                                     }
+{ Modified the original PMC1000 to do 3 things differently:                    }
+{ 1.  Added a valve SetPoint tellback at BxAI2 where x=6,7,8                   }
+{ 2.  P1 feeds T1 feeds V1, P2 & P3 feed T2 feeds V2, V1 & V2 feed T3          }
+{ 3.  Sine wave generator on B9AI0, Random generator on B9AI1                  }
+{==============================================================================}
+(
+  Name          <:TagField("SQL_VARCHAR(64)",  "Name",                     0 ):>     { Name of this tag                                };
+  Area          <:TagField("SQL_VARCHAR(255)", "Area",                     1 ):>     { Group which this tag belongs to                 };
+  Description   <:TagField("SQL_VARCHAR(255)", "Description",              2 ):>     { Desciption of TAG Instance                      };
+  PortTag       <:TagField("SQL_VARCHAR(255)", "Serial Port",              3 ):> = "..\*Port" { Port tag                                  };
+  HelpKey       <:TagField("SQL_VARCHAR(255)", "Help System Index",        4 ):>     { This is a text string which is used as a search };
+
+)
+
+[
+   { V 1.0.0 - original                                                        }
+   { V 2.0.0 - Updated after Dec 7th,1998 course - added config/refresh folder }
+   { V 2.0.1 - Switched to .src file Oct 25th course                           }
+   { V 2.0.2 - Added Error, ErrorCounts, VTSGetAddr error handling             }
+   { V 2.0.3 - Call to Refresh() in Init state required by VTS10.1             }
+   { V 3.0.0 - Redesign for use in tutorial, including:                        }
+   {           - Added a serial tab with an entry for a                        }
+   {                port tag for pseudo realism                                }
+   {           - Addresses follow Modicon format                               }
+   {           - Stopped the valves from bleeding tanks dry when < 10%         }
+   {           - Pump and valve flow go immediately to zero when less than     }
+   {             0.01 instead of tapering off at an infinitely decreasing rate }
+   {           - Valve digital ouput now initialized so the check for a        }
+   {               leading edge the first time they're opened works.           }
+
+
+  Version    = "3.0.0"                   { Driver version number code          };
+  LastEdit   = "Dec 23, 2011"            { Date of last revision               };
+  DriverName = "PMC1001"                 { Driver name                         };
+  ConfigFolder  Module            { Module that displays properties dialog     };
+  Refresh       Module            { The Refresh Subrountine                    };
+    {======== Required for all vts drivers ========}
+  VTSRead     Module          { The Read module                                };
+  VTSWrite    Module          { The Write module                               };
+  VTSGetAddr  Module          { Subroutine to parse address                    };
+  VTSMaxBlock Module          { Maximum comm block size function               };
+  Driver                      { The generic driver module instance             };
+  Value = 0                   { Alarm Status                                   };
+  Root                        { Instance of this module                        };
+  Ready     = 0               { Returns true when driver has started           };
+  SerErr                      { ComPort serial error for Client state          };
+  DriverObj                   { Object value of the non-Generic driver         };
+  LastValue = 0               { Last value written - used in Test Mode         };
+  WriteTest = 1               { == 1 for write test mode to XOR the last DO    };
+                              { command with the current one                   }
+    {======== Miscellaneous variables ========}
+    { Object Parameter Constants }
+  Constant #Name         = 0;
+  Constant #Area         = 1;
+  Constant #Description  = 2;
+  Constant #Port         = 3;
+  Constant #HelpKey      = 4;
+   { Data Registers }
+  DI[10][10];                { Digital Input for each channel, [Base][Chan]   }
+  DO[10][10];                { Digital Output for each channel, [Base][Chan]  }
+  AI[10][10];                { Analog Input for each channel, [Base][Chan]    }
+  AO[10][10];                { Analog Output for each channel, [Base][Chan]   }
+  Obj[10];                   { Object Vars for simulate modules instances     }
+  AIScales[10][10]           { Scale values for AI tags                       };
+  AOScales[10][10]           { Scale values for AO tags                       };
+  AIOffsets[10][10]          { Offset values for AI tags                      };
+  AOOffsets[10][10]          { Offset values for AO tags                      };
+  Maxpmp = 3;                { Number of pump objects being simulated         }
+    { Simulate Modules }
+  Pump   Module;             { Simulate up to 3 pumps at base = 0, 1, & 2     }
+  Tank   Module;             { Simulate up to 3 tanks at base = 3, 4, & 5     }
+  Valve  Module;             { Simulate up to 3 valves at base = 6, 7, & 8    }
+  Generator Module;          { Simulate a sine wave and random num generator  }
+
+  [ (GROUPS)
+    Shared Drivers            { Identify this as a driver point module        };
+  ]
+]
+
+Init [
+
+  If 1 Wait;
+  [
+    Root = Self();
+    Refresh();
+    { initialize scaling and offset arrays. Unscaled process data max is 4095 and Scaled is as per instructions }
+    AIScales[0][0] = AIScales[1][0] = AIScales[2][0] = 2.730666667;
+    AIScales[3][0] = AIScales[4][0] = AIScales[5][0] = AIScales[6][0] = AIScales[6][2] = AIScales[7][0] = AIScales[8][0] = 40.96;
+    AIScales[0][1] = AIScales[1][1] = AIScales[2][1] = 9.309090909;
+    AIScales[3][1] = AIScales[4][1] = AIScales[5][1] = 22.14054054;
+    AIScales[6][1] = AIScales[7][1] = AIScales[8][1] = 51.2;
+    AIScales[0][2] = AIScales[1][2] = AIScales[2][2] = 81.92;
+    AIScales[3][2] = AIScales[4][2] = AIScales[5][2] = AIScales[0][3] = AIScales[1][3] = AIScales[2][3] = 31.50769231;
+    AIScales[3][3] = AIScales[4][3] = AIScales[5][3] = 40.96;
+    AIScales[0][4] = AIScales[1][4] = AIScales[2][4] = 2.730666667;
+    AIScales[3][4] = AIScales[4][4] = AIScales[5][4] = 40.96;
+    AIScales[0][5] = AIScales[1][5] = AIScales[2][5] = 2.730666667;
+    AIScales[0][6] = AIScales[1][6] = AIScales[2][6] = 102.4;
+
+    AOScales[0][0] = AOScales[1][0] = AOScales[2][0] = 2.730666667;
+    AOScales[3][0] = AOScales[4][0] = AOScales[5][0] = AOScales[6][0] = AOScales[7][0] = AOScales[8][0] = 40.96;
+    AOScales[0][1] = AOScales[1][1] = AOScales[2][1] = 2.730666667;
+    AOScales[3][1] = AOScales[4][1] = AOScales[5][1] = 40.96;
+
+    AIOffsets[0][0] = AIOffsets[1][0] = AIOffsets[2][0] = 0;
+    AIOffsets[3][0] = AIOffsets[4][0] = AIOffsets[5][0] = AIOffsets[6][0] = AIOffsets[6][2] = AIOffsets[7][0] = AIOffsets[8][0] = 0;
+    AIOffsets[0][1] = AIOffsets[1][1] = AIOffsets[2][1] = 0;
+    AIOffsets[3][1] = AIOffsets[4][1] = AIOffsets[5][1] = 332.1081081;
+    AIOffsets[6][1] = AIOffsets[7][1] = AIOffsets[8][1] = 0;
+    AIOffsets[0][2] = AIOffsets[1][2] = AIOffsets[2][2] = 0;
+    AIOffsets[3][2] = AIOffsets[4][2] = AIOffsets[5][2] = 2205.538462;
+    AIOffsets[0][3] = AIOffsets[1][3] = AIOffsets[2][3] = 2205.538462;
+    AIOffsets[3][3] = AIOffsets[4][3] = AIOffsets[5][3] = 0;
+    AIOffsets[0][4] = AIOffsets[1][4] = AIOffsets[2][4] = 0;
+    AIOffsets[3][4] = AIOffsets[4][4] = AIOffsets[5][4] = 0;
+    AIOffsets[0][5] = AIOffsets[1][5] = AIOffsets[2][5] = 0;
+    AIOffsets[0][6] = AIOffsets[1][6] = AIOffsets[2][6] = 0;
+
+
+    AOOffsets[0][0] = AOOffsets[1][0] = AOOffsets[2][0] = 0;
+    AOOffsets[3][0] = AOOffsets[4][0] = AOOffsets[5][0] = AOOffsets[6][0] = AOOffsets[7][0] = AOOffsets[8][0] = 0;
+    AOOffsets[0][1] = AOOffsets[1][1] = AOOffsets[2][1] = 0;
+    AOOffsets[3][1] = AOOffsets[4][1] = AOOffsets[5][1] = 0;
+
+  ]
+]
+
+Wait [
+  { Wait for VTS Driver }
+  If TimeOut(2, *(Driver\RPCStatus)) Server;
+]
+
+Server [
+    { No lower level driver to Start }
+  DriverObj = Self();
+    { Start Simulation Modules }
+  Obj[0] = Pump(0);
+  Obj[1] = Pump(1);
+  Obj[2] = Pump(2);
+  Obj[3] = Tank(3);
+  Obj[4] = Tank(4);
+  Obj[5] = Tank(5);
+  Obj[6] = Valve(6);
+  Obj[7] = Valve(7);
+  Obj[8] = Valve(8);
+  Obj[9] = Generator(9);
+    { I'm ready }
+  If Watch(1);
+  [
+    Ready = 1;
+  ]
+]
+<
+{=========================== PMC1001\VTSGetAddr =============================}
+{   Values are as interpreted as follows:                                    }
+{            0-99 Digital inputs, 100-199 Digital outputs                    }
+{            40000-40099 Analog inputs,  40100-40199 Analog outputs          }
+{ This subroutine Parses the address "y0Yxn", (without leading zeros)        }
+{ y (Info1)  4 -> Analog (40000+)                                            }
+{ Y (Info1)  1 -> Output, 0 -> Input                                         }
+{ x (Info2) -> 0,1,2 (Pumps)                                                 }
+{           -> 3,4,5 (Tanks)                                                 }
+{           -> 6,7,8 (Valves)                                                }
+{           -> 9     (SineWave)                                              }
+{ n (MemAddr) Channel number                                                 }
+{ Never returns an error, sets Info3 = 1 instead                             }
+{============================================================================}
+VTSGetAddr
+(
+  Address                 { Address integer                                };
+  MemAddr                 { Channel number to read or write                };
+  BitNum                  { Not Used                                       };
+  Info1                   { The type of data to read or write
+                            0 = Digital Input,
+                            1 = Digital Output,
+                            2 = Analog Input
+                            3 = Analog Output                              };
+  Info2                   { Info2 - Base number b  (0-9)                   };
+  Info3                   { Info3 - Error indicator                        };
+)
+
+[
+  Err = 0            { Flag indicating an addressing syntax error          };
+  UAdr               { Text version of address                             };
+  Ch;
+]
+
+Main [
+
+  If 1;
+  [
+    *BitNum = Invalid    { Not used - maybe invalid };
+    Err    = 0           { Init to no error };
+    *Info3 = 0;
+      { Decode Address }
+
+    IFElse(Address >= 40100,    { Analog Output   }
+      *Info1 = 3,
+    { Else }
+      IFElse(Address >= 40000,  { Analog Input    }
+        *Info1 = 2,
+      { Else }
+        IFElse(Address >= 100,  { Digital Output  }
+          *Info1 = 1,
+        { Else }
+          IFElse(Address >= 0,  { Digital Input   }
+            *Info1 = 0,
+          { Else }
+            Err = 1          { Bad Data type in Address }
+          )  { End IfElse }
+        )  { End IfElse }
+      )  { End IfElse }
+    );  { End IfElse }
+
+    UAdr = Replace(Format(5,0,Address),0,5," ","0");
+
+      { Extract Base number from 4th Char }
+    *Info2 = Cast(SubStr(UAdr, 3, 1), 1)   { Convert to a number };
+      { Extract Channel from 5th Char }
+    *MemAddr = Cast(SubStr(UAdr, 4, 1), 1)   { Convert to a number };
+      { Check all are valid }
+    IfThen(!Valid(*MemAddr) || !Valid(*Info2)|| !Valid(*Info1) || Err,
+       { Indicate Error using Info3 - pass back address as text }
+      *MemAddr = PickValid(Cast(UAdr, 4 {Text}), "Blank/Invalid Address");
+       { All error addresses will be grouped togther }
+      *Info1 = *Info2 = 0;
+      *Info3 = 1       { Error indication };
+    );  { End Ifthen }
+
+    Return(0);
+  ]
+]
+{ End of PMC1001\VTSGetAddr }
+>
+<
+{============================ PMC1001\VTSMaxBlock =============================}
+{ Returns the maximum block size based on the passed in parameters.            }
+{==============================================================================}
+VTSMaxBlock
+(
+  Info1                   { Info1 from VTSGetAddr                           };
+  Info2                   { Info2 from VTSGetAddr                           };
+  Info3                   { Info3 from VTSGetAddr                           };
+  DataType                { Data Type from VTSGetAddr                       };
+)
+
+[
+  MaxNum                  { Maximum number                                  };
+]
+VTSMaxBlock [
+
+  If Watch(1);
+  [
+    Return(PickValid(Info3 == 1 ? 1000 : 10, 1000));
+  ]
+]
+{ End of PMC1001\VTSMaxBlock }
+>
+<
+{========================== PMC1001\VTSRead ================================}
+{ This module performs a simulated Read function after coalescing as many   }
+{ reads as possible to reduce communication overhead                        }
+{===========================================================================}
+VTSRead
+(
+  Trigger                   { Will do read on positive edge                    };
+  Array                     { Array to put the result into                     };
+  N                         { The number of values to read                     };
+  DevAddr                   { First Channel to read                            };
+  BitNum                    { Bit to read - NOT USED                           };
+  Info1                     { The type of data to read:
+                              0 = Digital Input,
+                              1 = Digital Output,
+                              2 = Analog Input
+                              3 = Analog Output                                };
+  Info2                     { Info2 - Base 0-9                                 };
+  Info3                     { Info3 - Address Error indicator                  };
+  DataType                  { Data type used for read - uses standard types    };
+  RefreshContext            { Used to set new values                           };
+)
+
+[
+  I           = 0           { General Loop variable                             };
+  Counts      = 0           { Good Counts  - required by VTSDriver              };
+  ErrorCounts = 0           { Error Counts - required by VTSDriver              };
+  Error       = 0           { Error - required by VTSDriver                     };
+]
+
+Main [
+
+   { Required by VTS Driver }
+  Return(Self());
+
+  If Trigger && !Info3;
+  [
+    ResetParm(Self(), 1);
+    I = 0;
+    IfElse(Info1 == 0,
+      ArrayOp2(Array[0], DI[Info2][DevAddr], N, 0),      { Digital Input  }
+    { Else }
+      Execute(
+        ArrayOp2(Array[0], AI[Info2][DevAddr], N, 0 {=});         { Analog Input   }
+        ArrayOp2(Array[0], AIScales[Info2][DevAddr], N, 4 {*});   { Scale to 0-4095 range }
+        ArrayOp2(Array[0], AIOffsets[Info2][DevAddr], N, 2 {-});   { Offset in 0-4095 range }
+      );
+    );  { End IfElse }
+    Counts++;
+  ]
+  If Trigger && Info3;
+  [
+    ResetParm(Self(), 1);
+    Error = 1;
+    ErrorCounts++;
+  ]
+]
+{ End of PMC1001\VTSRead }
+>
+
+
+<
+{================================ PMC1001\VTSWrite ============================}
+{ This module performs the Write function                                      }
+{==============================================================================}
+VTSWrite
+(
+  Trig                      { Will do read on positive edge                    };
+  Array                     { Array from which to write                        };
+  N                         { The number of values to write                    };
+  DevAddr                   { Channel to write                                 };
+  BitNum                    { Bit to write - NOT USED                          };
+  Info1                     { Info1 - The type of data:
+                              0 = Digital Input,
+                              1 = Digital Output,
+                              2 = Analog Input
+                              3 = Analog Output                                };
+  Info2                     { Info2 - Base 0-9                                 };
+  Info3                     { Info3 - Address Error indicator                  };
+)
+
+[
+  Trigger     = 0           { VTS Compatible trigger                            };
+  I           = 0           { General Loop variable                             };
+  Counts      = 0           { Good Counts  - required by VTSDriver              };
+  ErrorCounts = 0           { Error Counts - required by VTSDriver              };
+  Error       = 0           { Error - required by VTSDriver                     };
+]
+
+Main [
+
+   { Required by VTS Driver }
+  Return(Self());
+
+  If Trigger && !Info3;
+  [
+    ResetParm(Self(), 1);
+    i = 0;
+    IfElse(Info1 == 1,
+      ArrayOp2(DO[info2][DevAddr], Array[0], N, 0),     { Digital Output }
+    { Else }
+      Execute(
+        ArrayOp2(AO[info2][DevAddr], Array[0], N, 0, {=});                  { Analog Output }
+        ArrayOp2(AO[info2][DevAddr], AOOffsets[Info2][DevAddr], N, 1 {+});   { Offset from 0-4095 into the right range }
+        ArrayOp2(AO[info2][DevAddr], AOScales[Info2][DevAddr], N, 5 {/});   { Scale from 0-4095 into the right range }
+        { round down to avoid floating point math chaff }
+        ArrayOp1(Array[0], N, 1, 32 {Round});   { Offset in 0-4095 range }
+      );
+    );  { End IfElse }
+    Counts++;
+  ]
+  If Trigger && Info3;
+  [
+    ResetParm(Self(), 1);
+    ErrorCounts++;
+    Error = 1;
+  ]
+]
+
+{ End of PMC1001\VTSWrite }
+>
+
+<
+{===================== Pump Module =========================================}
+{ Simulate a pump operation                                                 }
+{  Motor/Pump   x ranges from 0 to 2 for pump1, pump2, pump3                }
+{    Speed  400x0       Volts  400x1       Amps  400x2      Temp   400x3    }
+{    Speed SetPoint  401x0      SpeedTripSP 401x1                           }
+{    StartStop TellBack  0x0     Speed Trip  0x5      Temp Trip  0x6        }
+{    Start  1x0         Stop  1x1        Reset  1x2                         }
+{---------------------------------------------------------------------------}
+Pump
+(
+  Num           { Number of instance of pump };
+)
+
+[
+     { Analog Inputs }
+   Speed = 0         { 400x0 to App };
+   Volts = 0         { 400x1 to App };
+   Amps  = 0         { 400x2 to App };
+   Temp  = 70        { 400x3 to App };
+   Flow  = 0         { 400x6 to App };
+     { Analog Outputs & Inputs }
+   SpeedSP     = 1000    { 401x0 from App , 400x4 to App };
+   SpeedTripSP = 1500    { 401x1 from App , 400x5 to App};
+     { Digital Inputs }
+   Running   = 0       { 0x0 to App : 0 == stopped, 1 == running };
+   SpeedTrip = 0       { 0x5 to App };
+   TempTrip  = 0       { 0x6 to App };
+     { Digital Outputs }
+   Start = 0         { 1x0 command to start - 5 sec };
+   StopM = 0         { 1x1 command to stop - 10 sec };
+   Reset = 0         { 1x2 from App };
+     { Internal Settings }
+   MaxSpeed = 1500   { Physical Motor Maximum                };
+   MaxTemp  = 200    { Physical Motor Maximum                };
+   MaxFlow  = 40     { Physical Pump Maximum                 };
+   MaxVolts = 440    { Motor Voltage rating - not set by app };
+   MaxAmps  = 50     { Motor Voltage rating - not set by app };
+   MaxAmpsSP         { Motor Voltage rating - not set by app };
+     { Misc }
+   UpON = 0          { Flag - motor starting up       };
+   DnON = 0          { Flag - motor stopping          };
+   Ramp[4]           { Hold curves generated          };
+   HiSpd             { Current speed while ramping up };
+]
+
+
+Pump [
+  Return(Self());
+    { Watch for changes in any analog or digital output }
+  If WatchArray(1, DO[Num][0], 10) || WatchArray(0, AO[Num][0], 10);
+  [
+    SpeedSP     = PickValid(AO[Num][0], SpeedSP);
+    SpeedTripSP = PickValid(AO[Num][1], SpeedTripSP);
+    Start       = PickValid(DO[Num][0], Start);
+    StopM       = PickValid(DO[Num][1], StopM);
+    Reset       = PickValid(DO[Num][2], Reset);
+  ]
+
+    { Keep Inputs current }
+  DI[Num][0] = Running;
+  DI[Num][5] = SpeedTrip;
+  DI[Num][6] = TempTrip;
+  AI[Num][0] = Speed;
+  AI[Num][1] = Volts;
+  AI[Num][2] = Amps;
+  AI[Num][3] = Temp;
+  AI[Num][4] = SpeedSP;
+  AI[Num][5] = SpeedTripSP;
+  AI[Num][6] = Flow;
+
+    { If receive start command, get stuff going }
+  If Start && !SpeedTrip && !TempTrip;
+  [
+    Running = 1;                           { Motor is running }
+    Volts = Format(1,0,(SpeedSP/MaxSpeed) * MaxVolts);  { Voltage is fraction of max }
+    MaxAmpsSP = MaxAmps * (SpeedSP / MaxSpeed);
+    UpON = 1;
+    DnON = Invalid;
+  ]
+    { If receive stop command, reset things }
+  If StopM;
+  [
+    Running = 0;                           { Motor is stopped }
+    Volts = 0;
+    UpOn = Invalid;
+    DnOn = 1;
+    HiSpd = Speed;
+  ]
+
+    { Calculate Speed when pump is running }
+  IF timeout(Running, 0.1);  { Re-calculate Speed each tenth of a sec }
+  [
+    Speed = Limit(Speed + (SpeedSP - Speed)/100, 0, MaxSpeed);  { ~10 sec curve up }
+  ]
+    { Calc falling speed when shut off }
+  If Timeout(!Running && speed > 0, 0.1);
+  [
+    IfElse(Speed > 0.01,
+           Speed = Limit(Speed - Speed/30, 0, MaxSpeed),      { ~3 sec ramp down }
+           Speed = 0);
+  ]
+    { Calc amps and temp }
+  Ramp[0] = PickValid(Limit(Intgr((1-Ramp[0])*UpON*0.25, 0.1), 0, 1), 0);  { rising curve }
+  Ramp[1] = PickValid(Limit(Intgr(DnON*0.25, 0.1), 0, 1), 0);              { Fast falling ramp }
+  Amps = Format(0,1,PickValid(Cond(Running, MaxAmpsSP + 10 * (1 - Ramp[0]), 0), Amps));
+  {Speed = PickValid(Cond(Running, SpeedSP * Ramp[0], HiSpd * (1 - Ramp[1])), Speed);}
+    { Temp increases linearly if on, decr if off - within limits }
+  If Timeout(UpON || DnON, 1);
+  [
+    Temp = Format(0,1,Limit(Cond(Running, Temp + 0.5, Temp - 1), 70, 190));
+  ]
+
+    { Monitor Over speed condition - set trip }
+  If Speed > SpeedTripSP && !SpeedTrip;
+  [
+    SpeedTrip = 1;
+      { Stop the motor }
+    Running = 0;                           { Motor is stopped }
+    Volts = 0;
+    UpOn = Invalid;
+    DnOn = 1;
+    HiSpd = Speed;
+  ]
+
+    { Monitor Over temp condition - set trip }
+  If Temp > Maxtemp && !TempTrip;
+  [
+    TempTrip = 1;
+      { Stop the motor }
+    Running = 0;                           { Motor is stopped }
+    Volts = 0;
+    UpOn = Invalid;
+    DnOn = 1;
+    HiSpd = Speed;
+  ]
+
+    { Reset trips }
+  If Reset;
+  [
+    SpeedTrip = 0;
+    TempTrip = 0;
+    Reset = DO[Num][2] = 0;  { Also clear Pmc array }
+  ]
+
+    { Calculate flow - follows speed up to maxflow }
+  Flow = Format(0,1,Scale(Speed, 0, MaxSpeed, 0, MaxFlow));
+]
+
+>  { End Pump Module }
+
+<
+{======================== Tank Module ========================================}
+{ Simulate a Tank operation                                                   }
+{ Tank   x ranges through 3, 4, and 5 for tank1, tank2 and tank3              }
+{  Level 400x0, Pressure 400x1, Temp 400x2, LoAlmSPtb 400x3, HiAlmSPtb 400x4  }
+{  LoAlm SetPoint  401x0      HiAlmSP SetPoint 401x1                          }
+{  LoAlarm  0x0      HiAlarm  0x1                                             }
+{-----------------------------------------------------------------------------}
+Tank
+(
+  Num           { Number of instance of tank };
+)
+
+[
+     { Analog Inputs }
+   Level = 0;         { 400x0 to App - Range 0 - 100 }
+   Pressure = 15;     { 400x1 to App - Range 15 - 200 psi }
+   Temp = 70;         { 400x2 to App }
+     { Analog Outputs & Inputs }
+   LoAlmSP = 90;      { 401x0 from App , 400x3 to App }
+   HiAlmSP = 95;      { 401x1 from App - 400x4 to App}
+     { Digital Inputs }
+   LoAlm = 0;         { 0x0 to App }
+   HiAlm = 0;         { 0x1 to App }
+     { Digital Outputs }
+     { Internal Settings }
+   MaxLevel = 100;    { Physical tank Maximum }
+   MaxTemp  = 200;    { Physical tank Maximum }
+   MaxPres  = 250;    { Physical tank Maximum }
+   TankVol  = 2000;   { Physical tank volume  }
+     { Misc }
+   UpON = 0;          { Flag - motor starting up }
+   DnON = 0;          { Flag - motor stopping }
+   Ramp[4];           { Hold curves generated }
+   Vol = 0;           { Volume of contents in tank }
+   OutFlow = 0;       { Outflow from tank }
+   Inflow = 2;
+]
+
+Tank [
+  Return(Self());
+    { Tank 3(x=5) is larger than tank1 or tank2 }
+  TankVol = Cond(Num == 5, 3000, 2000);
+
+    { If any output changes, update local vars }
+  IF WatchArray(1, DO[Num][0], 10) || WatchArray(0, AO[Num][0], 10);
+  [
+    LoAlmSP = PickValid(AO[Num][0], LoAlmSP);
+    HiAlmSP = PickValid(AO[Num][1], HiAlmSP);
+  ]
+  If Watch(1, Level, HiAlmSP, LoAlmSP);
+  [
+    IfElse(Level > HiAlmSP, HiAlm = 1, HiAlm = 0);
+    IfElse(Level < LoAlmSP, LoAlm = 1, LoAlm = 0);
+  ]
+
+    { Keep Inputs current }
+  DI[Num][0] = LoAlm;
+  DI[Num][1] = HiAlm;
+  AI[Num][0] = Level;
+  AI[Num][1] = Pressure;
+  AI[Num][2] = Temp;
+  AI[Num][3] = LoAlmSP;
+  AI[Num][4] = HiAlmSP;
+
+    { Flow depends on inlet and outlet flows  }
+  IF timeout(1, 0.1);  { Re-calculate volume each tenth of a sec }
+  [
+      { Tank1(x=3) is fed by pump1(x=0) and drained by valve1(x=6) }
+    IfThen(Num == 3, Inflow  = PickValid(Obj[0]\Flow, 0)/10,    { From pump 1 }
+                     outflow = PickValid(Obj[6]\Flow, 0)/10);   { From Valve 1 }
+      { Tank2(x=4) is fed by pump2(x=1) and pump3(x=2) and drained by valve2(x=7) }
+    IfThen(Num == 4, Inflow = PickValid(Obj[1]\Flow, 0)/10      { From pump 2 }
+                            + PickValid(Obj[2]\Flow, 0)/10,     { From pump 3 }
+                     OutFlow = PickValid(Obj[7]\Flow, 0)/10);   { From Valve 2 }
+      { Tank3(x=5) is fed by valve1(x=6) and valve2(x=7) and drained by valve3(x=8) }
+    IfThen(Num == 5, Inflow = PickValid(Obj[6]\Flow, 0)/10      { From valve 1 }
+                            + PickValid(Obj[7]\Flow, 0)/10,     { From valve 2 }
+                     Outflow = PickValid(Obj[8]\Flow, 0)/10);  { From Valve 3 }
+    Vol = Limit(Vol + Inflow - Outflow, 0, TankVol);
+    Level = Format(0,1,Limit(100 * (Vol / TankVol), 0, 99.9));       { Simple linear tank }
+    Pressure = Format(0,1,Limit(TankVol / (100 - Level), 15, 250));
+  ]
+
+  Temp = Format(0,1,70 + 30 * Sin(Intgr(0.01, 1)));
+]
+
+>  { End Tank Module }
+
+<
+{===================== Valve Module =========================================}
+{ Simulate a Valve operation                                                 }
+{  Valve   x ranges through 6, 7, and 8 for valve1, valve2, valve3           }
+{    Position 400x0,  Flow 400x1,  Setpoint Tellback 400x2                   }
+{    Position SetPoint  401x0                                                }
+{----------------------------------------------------------------------------}
+Valve
+(
+  Num           { Number of instance of Valve };
+)
+
+[
+     { Analog Inputs }
+   Position = 0;      { AI0 to App - Range 0 - 100 }
+   Flow     = 0;      { AI1 to App - Range 0 - 80 lps }
+     { Analog Outputs & Inputs }
+   PositionSP = 00;    { AO0 from App, 0 - 100 % }
+     { Internal Settings }
+   MaxFlow  = 80;     { Physical Valve Maximum }
+
+     { Misc }
+   Move = 0;          { Flag that position needs to move }
+
+]
+
+Valve [
+  Return(Self());
+
+    { If any output changes, update local vars }
+  If WatchArray(1, DO[Num][0], 10) || WatchArray(0, AO[Num][0], 10);
+  [
+     { Insure valid }
+    AO[Num][0] = PickValid(AO[Num][0], 50);
+    IfElse(DO[Num][0],
+      PositionSP = PickValid(AO[Num][0], 50);
+      PositionSP = 0;
+    ) { End IfElse };
+    PositionSP = Limit(PositionSP, 0, 100);
+    DI[Num][0] = PickValid(DI[Num][0], 0);
+  ]
+
+  { If 16D, 170, or 180 rising edge, write it back after 0.5 seconds }
+  If Timeout( Edge(PickValid(DO[Num][0], 0), 1), 0.5);
+  [
+    { 60/70/80 = 1 }
+    DI[Num][0] = 1;
+  ]
+
+  { If 60, 70, or 80 falling edge, write it back after 0.5 seconds }
+  If Timeout( Edge(PickValid(DO[Num][0], 1), 0), 0.5);
+  [
+    { 60/70/80 = 0 }
+    DI[Num][0] = 0;
+  ]
+
+    { Keep Inputs current }
+  AI[Num][0] = Position;
+  AI[Num][1] = Flow;
+  AI[Num][2] = PositionSP;   { Position Setpoint tellback }
+
+    { Valve position moves to Setpoint }
+  Move = Cond(Abs(Position - PositionSP) < .1, 0, 1);
+  If Timeout(1, 0.3);
+  [
+    IfElse(abs(PositionSP - Position) > 0.01,
+           Position = Limit(Position + (PositionSP - Position)/15, 0, 100),
+           Position = PositionSP);
+    { Flow depends on Valve Position , level in tank }
+      { Tank 1(x=3) feeds valve 1(x=6) }
+     IFThen(Num == 6,
+      Flow = cond(Obj[3]\Level > 0.1, MaxFlow * Position/100, 0));
+      { Tank 2(x=4) feeds valve 2(x=7) }
+    IFThen(Num == 7,
+      Flow = cond(Obj[4]\Level > 0.1, MaxFlow * Position/100, 0));
+      { Tank 3(x=5) feeds valve 3(x=8) }
+    IFThen(Num == 8,
+      Flow = cond(Obj[5]\Level > 0.1, MaxFlow * Position/100, 0));
+
+  ]
+]
+
+
+>  { End Valve Module }
+
+
+<
+{===================== Generator Module =====================================}
+{ Simulate a sine wave and random number Generator                           }
+{  Generator   Base Address  0-9   (Use 9)                                   }
+{    Sine Wave AI0,  Amplitude = Smin and Smax, Frequency = SFreq            }
+{    Random value AI1  Rmin to Rmax, changes every Rper sec                  }
+{----------------------------------------------------------------------------}
+Generator
+(
+  Num           { Number of instance of generator };
+)
+
+[
+     { Analog Inputs }
+   SineWave = 0             { AI0 to Application                               };
+   RandNum  = 0             { AI1 to Application                               };
+   Counter  = 0             { AI2 to Application                               };
+     { Amplitude and Period }
+   SSmin = 0                { Min value of sine wave                           };
+   SSmax = 100              { Max value of sine wave                           };
+   RRmin = 0                { Min value of Random number                       };
+   RRmax = 100              { Max value of Random number                       };
+   SSPer = 60               { Sine wave period in sec                          };
+   RRPer = 5                { Random Number change period (sec)                };
+]
+
+Generator [
+    { Set initial values - these may be changed by vars in Config.ini }
+  If Watch(1);
+  [
+    SSmin  = PickValid(\Smin,  SSmin);
+    SSmax  = PickValid(\Smax,  SSmax);
+    RRmin  = PickValid(\Rmin,  RRmin);
+    RRmax  = PickValid(\Rmax,  RRmax);
+    SSPer  = PickValid(\SPer,  SSPer);
+    RRPer  = PickValid(\RPer,  RRPer);
+  ]
+
+    { Keep Inputs current }
+  AI[Num][0] = SineWave;
+  AI[Num][1] = RandNum;
+  AI[Num][2] = Counter;
+
+   { Generate a sine wave }
+  SineWave = (SSmax - SSmin)/2 + (SSmax - SSmin)/2 * Sin(Intgr(6/SSPer, 0.1));
+   { Generate random values }
+  If timeout(1, RRPer);
+  [
+    RandNum = RRmin + (RRmax - RRmin) * Rand();
+  ]
+   { A counter }
+  If AbsTime(1, 1, 0);
+  [
+    Counter++;
+  ]
+]
+
+>  { End Generator Module }
+<
+{============================== Refresh ====================================}
+{ This subroutine runs on startup or whenever the parameters are changed    }
+{===========================================================================}
+Refresh
+(
+  Parm                    { pointer to an array of previous parameters     };
+)
+
+Refresh [
+  If 1;
+  [
+    Return(0);
+  ]
+]
+
+{ End of Refresh }
+>
+<
+{============================ ConfigFolder ====================================}
+{ This module displays the details for each of the panels in the tabbed        }
+{ dialog box with one state for each folder tab.                               }
+{==============================================================================}
+ConfigFolder
+(
+  Parms                      { Pointer to array of parameters                  };
+  Current                    { Currently selected tab                          };
+  PtrWaitClose                { Pointer to FLAG - True when wait to close      };
+  OKPressed                   { OKPressed from PropertiesDialog                };
+  CancelPressed               { True when cancel is pressed                    };
+)
+[
+  [ (1)
+    IDTabLabel      = "ID";
+    SerialTabLabel  = "Serial";
+
+  ]
+
+  Constant WIDTH    = 500;
+
+  Trigger                     { Edit field trigger                             };
+
+]
+Init [
+  If 1 Switch;
+  [
+
+    {***** Initialize the wait close flag to not wait *****}
+    *PtrWaitClose = 0;
+  ]
+]
+
+Switch [
+  If Current == 0 ID;
+  If Current == 1 SERIAL;
+]
+
+  { Point Identification tab }
+ID [
+  {**** If page changes, change states *****}
+  If Current != 0 && ! *PtrWaitClose Switch;
+
+  {***** Let the caller know when its ok to close *****}
+  *PtrWaitClose = PickValid(Trigger, 1) == 0;
+
+   {***** Name of the point *****}
+  GUITransform(30, 90, 470, 45,
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditName(Trigger { trigger }));
+
+  {***** Group (area) that the point belongs to *****}
+  GUITransform(30, 200 { btm at 145 }, 470, 100,
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PAreaSelect(1 { can edit }, 2 { ID }, Parms[1] { Init },
+                                          1 { Bevel }, 0 { VertAlign },
+                                          1 { AlignTitle }, 1 { ParmNum },
+                                          Trigger { Trigger }, OKPressed));
+
+  {***** Description of the point *****}
+  GUITransform(30, 200, 470, 155,
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(2, \DescriptionLabel, 4 { text }, 3 { ID }, Trigger { trigger }));
+
+  {***** Help key *****}
+  GUITransform(30, 255, 470, 210,
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PEditField(\#HelpKey, \HelpSearchKeyLabel, 4 { text }, 4 { ID }, Trigger { trigger }));
+
+]
+
+  { Port Identification tab }
+SERIAL [
+
+  {**** If page changes, change states *****}
+  If Current != 1 && ! *PtrWaitClose Switch;
+
+  {***** Let the caller know when its ok to close *****}
+  *PtrWaitClose = PickValid(Trigger, 1) == 0;
+
+  {***** Port point *****}
+  GUITransform(30, 145 { btm at 90 }, 470, 45,
+               1, 1, 1, 1, 1            { No scaling                     },
+               0, 0, 1, 0               { No movement; visible; reserved },
+               0, 0, 0                  { Not selectable                 },
+               \DialogLibrary\PSelectObject(\#Port, "Ports" { point type },
+                 \PortLabel, 1 { & 2 - ID }));
+]
+
+{ End of ConfigFolder }
+>
+{ End of PMC1001 }

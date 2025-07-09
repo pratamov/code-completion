@@ -1,0 +1,52 @@
+{=========================== WebFunctionWhiteList ============================}
+{ The web function whitelist.                                                 }
+{ This module must be declared in AppRoot.SRC as "WebFunctionWhitelist" is    }
+{ called immediately before executing any function called via a VTS-BIN url.  }
+{ This subroutine should return TRUE if the function may be called.           }
+{ The subroutine is passed the following parameters:                          }
+{   TargetFunction: name of the function to be called as a string             }
+{   Username      : Name of the user making the request                       }
+{   Headers       : Array of http headers from the request                    }
+{   Parms         : The parameters from the request, includes leading "?"     }
+{                                                                             }
+{ This example function checks for two allowed function calls, that the       }
+{ requesting user has the first application privilege, that the headers       }
+{ contain the host name of the server and that the parameters are either      }
+{ "a=1" or "a=2".                                                             }
+{=============================================================================}
+(
+  TargetFunction              { The name of function to be called             };
+  Username                    { User making the request                       };
+  Headers                     { Array of headers for the request              };
+  Parms                       { Parameters for the request                    };
+)
+
+WFWhiteList [
+  If Watch(1);
+  [
+    { Check if the function is permitted }
+    IfThen(!((StrICmp(TargetFunction, "FirstFunction") == 0) ||
+             (StrICmp(TargetFunction, "SecondFunction") == 0)),
+      Return(FALSE);
+    );
+
+    { Check if the user has the required privilege, app privs start at 16 }
+    IfThen(!\SecurityManager\SecurityCheck(16, TRUE, Username),
+      Return(FALSE);
+    );
+
+    { Check the headers are acceptable }
+    IfThen(!Valid(TextSearch(Headers[0], ArraySize(Headers, 0), "Host: my.host.name", FALSE)),
+      Return(FALSE);
+    );
+
+    { Check if the parameters are acceptable }
+    IfThen(!((StrICmp(Parms, "?a=1") == 0) ||
+             (StrICmp(Parms, "?a=2") == 0)),
+      Return(FALSE);
+    );
+
+    { All checks pass, the call is permitted }
+    Return(TRUE);
+  ]
+]

@@ -1,0 +1,33 @@
+{=========================== ColorCycle.SRC ==================================}
+{ A simple demonstration module. Displays a message that changes              }
+{ color every two seconds                                                     }
+( {Parameters...}
+  Message             { Optional paramter for the text to display             };
+  Xcoord              { Optional X & Y location for the message               };
+  Ycoord;
+)
+[ {Variables...}
+  NextColor = 0       { Next color to use from the VTScada palette.           };
+  LocX                { Local storage of the coordinates                      };
+  LocY;
+]
+
+Init [  { Set defaults for the parameters}
+  If 1 Main;
+  [
+    Message = PickValid(Message, "Hello World!");
+    LocX    = Max(10, PickValid(Xcoord, 100))  { >= 10 pixels from the edge   };
+    LocY    = Max(55, PickValid(Ycoord, 100))  { Room for the title bar       };
+  ]
+]
+
+Main [
+  ZText(LocX, LocY, Message, NextColor, 0); 
+  If Watch(1, \TwoSecondFlasher);
+  [
+    NextColor++;
+    IfThen(NextColor > 255, 
+      NextColor = 0;
+    );
+  ]
+]
